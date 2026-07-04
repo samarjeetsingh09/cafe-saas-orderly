@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getMenuBySlug, getTableByToken } from "@/lib/menu";
 import { randomToken } from "@/lib/tokens";
+import { razorpayConfigured } from "@/lib/razorpay";
 import { MenuBrowser } from "@/components/customer/MenuBrowser";
 import { InvalidTable, MenuUnavailable } from "@/components/customer/MenuUnavailable";
 
@@ -34,6 +35,7 @@ export default async function Page({ params }: Props) {
       menu={menu}
       table={{ token: tableToken, number: table.tableNumber }}
       sessionToken={randomToken()}
+      onlineEnabled={razorpayConfigured()}
     />
   );
 }

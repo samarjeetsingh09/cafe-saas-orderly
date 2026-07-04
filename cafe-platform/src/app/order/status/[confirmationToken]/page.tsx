@@ -81,6 +81,7 @@ export default async function Page({ params }: Props) {
   }
 
   const cashPending = order.paymentStatus === "cash_pending";
+  const paymentPending = order.paymentStatus === "payment_pending";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center bg-background px-4 py-8">
@@ -132,12 +133,18 @@ export default async function Page({ params }: Props) {
       {/* Payment status */}
       <p
         className={`mt-4 rounded-full px-4 py-2 text-sm font-semibold ${
-          cashPending ? "bg-warning/15 text-[#92400e]" : "bg-success/15 text-success"
+          cashPending
+            ? "bg-warning/15 text-[#92400e]"
+            : paymentPending
+              ? "bg-info/15 text-info"
+              : "bg-success/15 text-success"
         }`}
       >
         {cashPending
           ? `Pay ${priceLabel(order.totalAmount.toString())} in cash at your table`
-          : "Paid"}
+          : paymentPending
+            ? "Confirming your payment… refresh in a moment"
+            : "Paid"}
       </p>
 
       <p className="mt-6 text-center text-sm text-muted">

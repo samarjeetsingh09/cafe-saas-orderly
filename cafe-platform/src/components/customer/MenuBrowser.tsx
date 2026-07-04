@@ -37,9 +37,29 @@ type Props = {
   table?: { token: string; number: string };
   /** Fresh per page load (Security doc 3.2 Risk 1). */
   sessionToken?: string;
+  /** True when Razorpay keys are configured server-side (M5). */
+  onlineEnabled?: boolean;
 };
 
-export function MenuBrowser({ menu, table, sessionToken }: Props) {
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
+
+/** Loads checkout.js once; resolves false on network failure. */
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
+export function MenuBrowser({ menu, table, sessionToken, onlineEnabled }: Props) {
   const router = useRouter();
   const ordering = Boolean(table && sessionToken);
 
@@ -48,6 +68,7 @@ export function MenuBrowser({ menu, table, sessionToken }: Props) {
   const [activeCat, setActiveCat] = useState(menu.categories[0]?.id);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [payMode, setPayMode] = useState<"cash" | "online">("cash");
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -77,29 +98,68 @@ export function MenuBrowser({ menu, table, sessionToken }: Props) {
     if (!detailsValid || placing || !table || !sessionToken) return;
     setPlacing(true);
     setPlaceError(null);
+    const payload = {
+      tableToken: table.token,
+      sessionToken,
+      customerName: name.trim(),
+      customerPhone: phone,
+      items: lines.map((l) => ({ menuItemId: l.item.id, quantity: l.qty })),
+    };
     try {
-      const res = await fetch("/api/orders/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tableToken: table.token,
-          sessionToken,
-          customerName: name.trim(),
-          customerPhone: phone,
-          paymentMode: "cash",
-          items: lines.map((l) => ({ menuItemId: l.item.id, quantity: l.qty })),
-        }),
-      });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.confirmationToken) {
-        router.push(`/order/status/${data.confirmationToken}`);
+      if (payMode === "cash") {
+        const res = await fetch("/api/orders/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, paymentMode: "cash" }),
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data?.confirmationToken) {
+          router.push(`/order/status/${data.confirmationToken}`);
+          return;
+        }
+        setPlaceError(data?.error ?? "Could not place your order. Please try again.");
         return;
       }
-      setPlaceError(data?.error ?? "Could not place your order. Please try again.");
+
+      // Online: create payment_pending order + Razorpay order, open checkout.
+      // paid is set only by the server webhook — this browser just redirects.
+      const res = await fetch("/api/payments/razorpay-create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.razorpayOrderId) {
+        setPlaceError(data?.error ?? "Could not start the payment. Please try again.");
+        return;
+      }
+      if (!(await loadRazorpayScript()) || !window.Razorpay) {
+        setPlaceError("Payment failed to load. Check your connection or pay cash at the table.");
+        return;
+      }
+      const rzp = new window.Razorpay({
+        key: data.keyId,
+        order_id: data.razorpayOrderId,
+        amount: data.amountPaise,
+        currency: data.currency,
+        name: menu.cafeName,
+        prefill: { name: name.trim(), contact: phone },
+        handler: () => {
+          router.push(`/order/status/${data.confirmationToken}`);
+        },
+        modal: {
+          ondismiss: () => {
+            setPlaceError("Payment not completed. Please try again, or pay cash at the table.");
+            setPlacing(false);
+          },
+        },
+      });
+      rzp.open();
+      return; // keep the button in its placing state while checkout is open
     } catch {
       setPlaceError("No connection. Check your network and try again.");
     } finally {
-      setPlacing(false);
+      if (payMode === "cash") setPlacing(false);
     }
   }
 
@@ -309,7 +369,41 @@ export function MenuBrowser({ menu, table, sessionToken }: Props) {
                       className="min-h-12 rounded-lg border border-border bg-surface px-3 outline-none placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/30"
                     />
                   </div>
-                  <p className="text-sm text-muted">Pay with cash at your table.</p>
+                  {onlineEnabled ? (
+                    <fieldset className="flex flex-col gap-2">
+                      <legend className="mb-1 text-sm font-medium">How would you like to pay?</legend>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setPayMode("online")}
+                          aria-pressed={payMode === "online"}
+                          className={`flex min-h-16 cursor-pointer flex-col items-center justify-center rounded-xl border-2 px-2 font-semibold transition-colors duration-200 ${
+                            payMode === "online"
+                              ? "border-accent bg-accent/10 text-primary"
+                              : "border-border text-muted hover:border-accent/50"
+                          }`}
+                        >
+                          Pay now
+                          <span className="text-xs font-normal">UPI · card</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPayMode("cash")}
+                          aria-pressed={payMode === "cash"}
+                          className={`flex min-h-16 cursor-pointer flex-col items-center justify-center rounded-xl border-2 px-2 font-semibold transition-colors duration-200 ${
+                            payMode === "cash"
+                              ? "border-accent bg-accent/10 text-primary"
+                              : "border-border text-muted hover:border-accent/50"
+                          }`}
+                        >
+                          Pay cash
+                          <span className="text-xs font-normal">at your table</span>
+                        </button>
+                      </div>
+                    </fieldset>
+                  ) : (
+                    <p className="text-sm text-muted">Pay with cash at your table.</p>
+                  )}
                   <button
                     onClick={placeOrder}
                     disabled={!detailsValid || placing}
