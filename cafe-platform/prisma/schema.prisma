@@ -1,0 +1,218 @@
+// Cafe QR Ordering Platform — full MVP schema
+// Source of truth: Technical_Architecture_Document.md Section 4 + DESIGN_SYSTEM.md build-plan impacts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7: connection URLs are configured in prisma.config.ts (migrations)
+  // and via the pg driver adapter in src/lib/db.ts (runtime).
+}
+
+enum SubscriptionStatus {
+  active
+  expiring_soon
+  expired
+  disabled
+}
+
+enum PrinterConnectionType {
+  lan
+  usb_helper
+  bluetooth
+  not_configured
+}
+
+enum PaymentMode {
+  online
+  cash
+}
+
+enum PaymentStatus {
+  paid
+  cash_pending
+  collected
+}
+
+enum PrintStatus {
+  pending
+  sent
+  failed
+}
+
+enum PlatformPaymentType {
+  setup_advance
+  setup_final
+  subscription_renewal
+}
+
+enum QueryStatus {
+  open
+  resolved
+}
+
+enum AdminRole {
+  founder
+  support_staff
+}
+
+model Cafe {
+  id                    String                @id @default(uuid()) @db.Uuid
+  name                  String
+  slug                  String                @unique // customer-facing URL: /{slug}/t/{token}; reserved names blocked in app layer
+  ownerName             String                @map("owner_name")
+  phone                 String                @unique // owner login identifier
+  passwordHash          String                @map("password_hash") // bcrypt
+  address               String?
+  setupFeeAmount        Decimal               @default(0) @map("setup_fee_amount") @db.Decimal(10, 2)
+  setupFeeAdvancePaid   Boolean               @default(false) @map("setup_fee_advance_paid") // 30% advance
+  setupFeeFullPaid      Boolean               @default(false) @map("setup_fee_full_paid") // remaining 70%
+  subscriptionStatus    SubscriptionStatus    @default(active) @map("subscription_status")
+  subscriptionStartDate DateTime?             @map("subscription_start_date") @db.Date
+  subscriptionEndDate   DateTime?             @map("subscription_end_date") @db.Date // drives 5-day reminder + auto-disable cron
+  subscriptionAmount    Decimal               @default(0) @map("subscription_amount") @db.Decimal(10, 2)
+  menuEnabled           Boolean               @default(false) @map("menu_enabled") // FR-24 master switch, checked before rendering customer menu
+  printerConnectionType PrinterConnectionType @default(not_configured) @map("printer_connection_type")
+  printerConfig         Json?                 @map("printer_config") // e.g. { "ip": "192.168.1.50" } for LAN
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  tables               Table[]
+  categories           Category[]
+  menuItems            MenuItem[]
+  orders               Order[]
+  subscriptionPayments SubscriptionPayment[]
+  supportQueries       SupportQuery[]
+
+  @@map("cafes")
+}
+
+model Table {
+  id          String   @id @default(uuid()) @db.Uuid
+  cafeId      String   @map("cafe_id") @db.Uuid
+  tableNumber String   @map("table_number") // "5", "Patio-2"
+  qrToken     String   @unique @map("qr_token") // long random token in the QR URL — frozen once stickers are printed
+  qrCodeUrl   String?  @map("qr_code_url") // generated QR image in Supabase Storage
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  cafe   Cafe    @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@unique([cafeId, tableNumber])
+  @@map("tables")
+}
+
+model Category {
+  id           String   @id @default(uuid()) @db.Uuid
+  cafeId       String   @map("cafe_id") @db.Uuid
+  name         String
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  cafe      Cafe       @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  menuItems MenuItem[]
+
+  @@map("categories")
+}
+
+model MenuItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  cafeId       String   @map("cafe_id") @db.Uuid
+  categoryId   String   @map("category_id") @db.Uuid
+  name         String
+  description  String?
+  price        Decimal  @db.Decimal(10, 2)
+  photoUrl     String?  @map("photo_url") // Supabase Storage
+  isVeg        Boolean  @default(true) @map("is_veg") // green/red marker on customer menu
+  isAvailable  Boolean  @default(true) @map("is_available") // sold-out toggle
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  cafe       Cafe        @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("menu_items")
+}
+
+model Order {
+  id                   String        @id @default(uuid()) @db.Uuid
+  cafeId               String        @map("cafe_id") @db.Uuid
+  tableId              String        @map("table_id") @db.Uuid
+  orderNumber          Int           @map("order_number") // sequential per cafe, staff-facing only — NEVER in customer URLs
+  customerSessionToken String        @map("customer_session_token") // scopes what a customer's browser may see (Security doc 3.2 Risk 1)
+  confirmationToken    String        @unique @map("confirmation_token") // unguessable customer status-page URL (Security doc 3.2 Risk 2)
+  customerName         String        @map("customer_name")
+  customerPhone        String        @map("customer_phone")
+  paymentMode          PaymentMode   @map("payment_mode")
+  paymentStatus        PaymentStatus @map("payment_status")
+  totalAmount          Decimal       @map("total_amount") @db.Decimal(10, 2)
+  razorpayOrderId      String?       @map("razorpay_order_id")
+  razorpayPaymentId    String?       @map("razorpay_payment_id")
+  printStatus          PrintStatus   @default(pending) @map("print_status") // drives FR-9 printer-failure alert
+  createdAt            DateTime      @default(now()) @map("created_at")
+
+  cafe       Cafe        @relation(fields: [cafeId], references: [id], onDelete: Restrict)
+  table      Table       @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  orderItems OrderItem[]
+
+  @@unique([cafeId, orderNumber])
+  @@index([cafeId, createdAt])
+  @@index([customerSessionToken])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                String  @id @default(uuid()) @db.Uuid
+  orderId           String  @map("order_id") @db.Uuid
+  menuItemId        String? @map("menu_item_id") @db.Uuid // nullable: historical orders survive menu-item deletion
+  itemNameSnapshot  String  @map("item_name_snapshot") // captured at order time
+  itemPriceSnapshot Decimal @map("item_price_snapshot") @db.Decimal(10, 2)
+  quantity          Int
+  subtotal          Decimal @db.Decimal(10, 2)
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+
+  @@map("order_items")
+}
+
+model SubscriptionPayment {
+  id          String              @id @default(uuid()) @db.Uuid
+  cafeId      String              @map("cafe_id") @db.Uuid
+  amount      Decimal             @db.Decimal(10, 2)
+  paymentType PlatformPaymentType @map("payment_type")
+  paymentDate DateTime            @default(now()) @map("payment_date")
+  periodStart DateTime?           @map("period_start") @db.Date
+  periodEnd   DateTime?           @map("period_end") @db.Date
+
+  cafe Cafe @relation(fields: [cafeId], references: [id], onDelete: Restrict)
+
+  @@map("subscription_payments")
+}
+
+model SupportQuery {
+  id         String      @id @default(uuid()) @db.Uuid
+  cafeId     String      @map("cafe_id") @db.Uuid
+  message    String
+  status     QueryStatus @default(open)
+  createdAt  DateTime    @default(now()) @map("created_at")
+  resolvedAt DateTime?   @map("resolved_at")
+
+  cafe Cafe @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+
+  @@map("support_queries")
+}
+
+model Admin {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String
+  phone        String    @unique
+  passwordHash String    @map("password_hash")
+  role         AdminRole @default(founder) // single founder row in MVP; support_staff ready for later hires
+
+  @@map("admins")
+}

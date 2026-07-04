@@ -1,0 +1,5 @@
+import { Placeholder } from "@/components/shared/Placeholder";
+
+export default function Page() {
+  return <Placeholder title="Order Confirmation" milestone="M4" />;
+}
