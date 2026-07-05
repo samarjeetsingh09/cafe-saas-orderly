@@ -1,5 +1,11 @@
-import { Placeholder } from "@/components/shared/Placeholder";
+import { getOwnerCafe } from "@/lib/session";
+import { getOwnerMenu } from "@/lib/owner-menu";
+import { MenuManager } from "@/components/owner/MenuManager";
 
-export default function Page() {
-  return <Placeholder title="Menu Management" milestone="M6" />;
+export const dynamic = "force-dynamic";
+
+export default async function OwnerMenuPage() {
+  const cafe = (await getOwnerCafe())!;
+  const categories = await getOwnerMenu(cafe.id);
+  return <MenuManager initialCategories={categories} />;
 }

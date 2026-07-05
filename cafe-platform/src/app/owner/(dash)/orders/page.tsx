@@ -1,5 +1,18 @@
-import { Placeholder } from "@/components/shared/Placeholder";
+import { getOwnerCafe } from "@/lib/session";
+import { getTodayOrders } from "@/lib/owner-orders";
+import { OrdersFeed } from "@/components/owner/OrdersFeed";
 
-export default function Page() {
-  return <Placeholder title="Live Orders" milestone="M6" />;
+export const dynamic = "force-dynamic";
+
+export default async function OwnerOrdersPage() {
+  const cafe = (await getOwnerCafe())!;
+  const orders = await getTodayOrders(cafe.id);
+
+  return (
+    <div>
+      <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
+      <p className="mt-1 mb-6 text-sm text-slate-500">Today&apos;s orders, newest first.</p>
+      <OrdersFeed initialOrders={orders} />
+    </div>
+  );
 }
