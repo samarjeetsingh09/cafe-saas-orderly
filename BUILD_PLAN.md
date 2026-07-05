@@ -245,6 +245,20 @@
 
 ---
 
+## Milestone 13 — Marketing Website (added 2026-07-05, founder request)
+
+**Goal:** Public front door at `/` — showcase the service (menupe.com reference), capture leads.
+
+- [x] Landing page at root: hero (real product UI in phone frame), commission-math band, 3-step how-it-works, 6 features, use-cases, contact-us pricing (no numbers), footer
+- [x] Brand constants in `src/lib/brand.ts` — working title **"OrderLy"** + placeholder contact number; single-file swap when founder decides
+- [x] Lead capture: `leads` table (fresh/contacted/converted/dropped), `POST /api/leads` (rate-limited, phone-validated, 24h same-phone dedupe), form + WhatsApp/call buttons
+- [ ] Leads list view in admin portal (fold into M10)
+- [ ] Real brand name, contact number, and any real cafe testimonials/logos (founder)
+
+**Done when:** A cafe owner can land on `/`, understand the offer, and leave a lead the founder sees in the admin portal.
+
+---
+
 ## Explicitly Deferred (do not build in MVP)
 
 Customer order-status tracking · KDS screen · multi-location · loyalty/accounts · WhatsApp ordering · inventory · reservations · multi-language · multi-admin roles · automated refunds · automated WhatsApp/SMS sending · USB/Bluetooth print paths (until a cafe needs one) · push notifications.

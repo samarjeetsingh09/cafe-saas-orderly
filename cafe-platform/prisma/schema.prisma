@@ -208,6 +208,28 @@ model SupportQuery {
   @@map("support_queries")
 }
 
+enum LeadStatus {
+  fresh
+  contacted
+  converted
+  dropped
+}
+
+/// Marketing-site lead: cafe owner who asked to be contacted (landing page form).
+model Lead {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String
+  phone     String
+  cafeName  String     @map("cafe_name")
+  city      String?
+  message   String?
+  status    LeadStatus @default(fresh)
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("leads")
+}
+
 model Admin {
   id           String    @id @default(uuid()) @db.Uuid
   name         String

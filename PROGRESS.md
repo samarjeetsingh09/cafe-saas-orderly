@@ -34,6 +34,8 @@ Three surfaces: customer app (`/{cafeSlug}`), owner dashboard (`/owner/*`), foun
 | M10 Founder admin portal | ⬜ (reconcile endpoint already built) | — |
 | M11 Subscription cron | ⬜ | — |
 | M12 Hardening + deploy | ⬜ | — |
+| M13 Marketing website (added 2026-07-05) | ✅ done + verified (20 checks); leads-in-admin folded into M10 | see git log |
+| M6 photo upload (was blocked) | ✅ done — local-disk pluggable storage | see git log |
 
 ---
 
@@ -98,6 +100,13 @@ Three surfaces: customer app (`/{cafeSlug}`), owner dashboard (`/owner/*`), foun
 - **QR Codes:** data-URL QRs generated per request with `qrcode` pkg (already a dep), origin from request headers; download links. M9 persists real assets.
 - **Billing:** status badge + expiry + `subscription_payments` history. **Support:** `POST /api/owner/support` + list w/ open/resolved. **Reports:** last-14-IST-days raw SQL (`AT TIME ZONE 'Asia/Kolkata'`), online/cash split table.
 - **Verified (25 checks, script pattern in scratchpad):** owner API 401 w/o session, concurrent collect → exactly one 200 + one 409, collect unknown 404, foreign-category dish 404, negative price 400, full UI walk of all 7 tabs, add category+dish through modals, sold-out toggle reflects on customer `/demo-cafe` instantly, More sheet nav, no overflow at 500px. Re-runs need DB cleanup of `Verify Dish`/`Verify Cat` rows.
+
+### M13 Marketing website + photo upload (added by founder 2026-07-05)
+- **Landing at `/`** (`src/app/page.tsx`): menupe.com-style structure — hero w/ static replica of real customer menu in a phone frame (`PhoneDemo`), dark commission-math band (₹375 vs ₹500 on a ₹500 order), 3 steps, 6 features, use-cases, pricing = "talk to us" (founder chose no public numbers), lead form + WhatsApp/call buttons, footer. Warm brand palette + Geist (locked) — /ui-pro's Playfair/red recommendation rejected.
+- **Brand = "OrderLy" (working title)** + placeholder phone `+91 99999 00000` — both ONLY in `src/lib/brand.ts`, single-file swap when founder decides.
+- **Leads:** migration `20260705083949_leads` (`LeadStatus` fresh/contacted/converted/dropped), `POST /api/leads` — public, 5/min/IP rate cap, Indian-mobile regex, 24h same-phone dedupe. Admin leads view folded into M10. ⚠️ `leads` table not yet in `prisma/rls/001_rls_policies.sql` — add deny-all-for-anon when doing the Supabase swap.
+- **Photo upload (M6 leftover, founder picked local-disk pluggable):** `src/lib/storage.ts` — magic-byte sniff (JPG/PNG/WebP), 2MB cap (Security 5.9), writes `<project>/uploads/menu/<cafeId>/<random>.<ext>` (gitignored), served by `GET /api/images/[...path]` (traversal-guarded, immutable cache). `POST /api/owner/photos` (owner-scoped) returns URL; DishModal upload+preview+remove replaced the URL stub; customer menu already rendered `photoUrl`. **Supabase swap = reimplement `saveMenuPhoto()` only.**
+- **Verified (20 checks, `verify-mkt.js` pattern):** lead 400/201/dedupe, upload 401 w/o session, fake-PNG + oversize rejected, uploaded file serves, path traversal 404, dish PATCH w/ uploaded URL → customer menu shows it, landing browser walk (hero/band/steps/features/no-price/WhatsApp/demo link/form success), no overflow at 500px.
 
 ---
 

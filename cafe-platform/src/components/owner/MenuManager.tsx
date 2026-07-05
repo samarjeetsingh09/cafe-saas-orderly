@@ -391,19 +391,11 @@ function DishModal({
             ))}
           </div>
         </fieldset>
-        <label className="block text-sm font-medium text-slate-700">
-          Photo link <span className="font-normal text-slate-400">(optional)</span>
-          <input
-            type="url"
-            placeholder="https://…"
-            value={form.photoUrl}
-            onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
-            className={FIELD}
-          />
-          <span className="mt-1 block text-xs font-normal text-slate-400">
-            Photo upload arrives soon — paste an image link for now.
-          </span>
-        </label>
+        <PhotoField
+          photoUrl={form.photoUrl}
+          onChange={(url) => setForm({ ...form, photoUrl: url })}
+          onError={setError}
+        />
 
         {error && (
           <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -429,6 +421,86 @@ function DishModal({
         </div>
       </form>
     </ModalShell>
+  );
+}
+
+/** Dish photo: upload to /api/owner/photos, keep the returned URL in the form. */
+function PhotoField({
+  photoUrl,
+  onChange,
+  onError,
+}: {
+  photoUrl: string;
+  onChange: (url: string) => void;
+  onError: (msg: string | null) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    onError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/owner/photos", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        onError(data.error ?? "Could not upload the photo. Try again.");
+        return;
+      }
+      onChange(data.url);
+    } catch {
+      onError("Network problem. Try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <span className="block text-sm font-medium text-slate-700">
+        Photo <span className="font-normal text-slate-400">(optional, JPG/PNG/WebP up to 2 MB)</span>
+      </span>
+      <div className="mt-1.5 flex items-center gap-3">
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- small preview of an uploaded file
+          <img src={photoUrl} alt="Dish photo preview" className="h-16 w-16 rounded-lg border border-slate-200 object-cover" />
+        ) : (
+          <span className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-slate-300 text-slate-300">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="h-6 w-6" aria-hidden="true">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Zm10.5-11.25h.008v.008h-.008V9.75Z"
+              />
+            </svg>
+          </span>
+        )}
+        <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-50">
+          {uploading ? "Uploading…" : photoUrl ? "Change photo" : "Upload photo"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            disabled={uploading}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) upload(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {photoUrl && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="cursor-pointer text-sm font-medium text-slate-500 transition-colors duration-150 hover:text-error"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

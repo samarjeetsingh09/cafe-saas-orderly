@@ -59,10 +59,11 @@ export function cleanPrice(v: unknown): number | null {
   return Math.round(n * 100) / 100;
 }
 
-/** Optional photo URL (Supabase upload lands later; URL field for now). */
+/** Optional photo URL: our own upload path (/api/images/…) or a full http(s) link. */
 export function cleanPhotoUrl(v: unknown): string | null | "invalid" {
   if (v === undefined || v === null || v === "") return null;
   if (typeof v !== "string" || v.length > 500) return "invalid";
+  if (/^\/api\/images\/[\w\-./]+$/.test(v) && !v.includes("..")) return v;
   try {
     const u = new URL(v);
     return u.protocol === "http:" || u.protocol === "https:" ? v : "invalid";
