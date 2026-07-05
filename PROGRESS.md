@@ -1,7 +1,7 @@
 # PROGRESS — Cafe QR Ordering Platform
 
-**Last updated:** 2026-07-05 (M6 done + verified)
-**Where to resume:** Milestone 7 — Realtime popup + sound (needs Supabase project; M8 print relay can go first if keys still missing — TCP mock works locally)
+**Last updated:** 2026-07-05 (M6 + M13 marketing site + photo upload done + verified)
+**Where to resume:** Milestone 7 — Realtime popup + sound (needs Supabase project; M8 print relay can go first if keys still missing — TCP mock works locally). M10 admin portal now also includes a **leads list view** (M13 follow-up).
 
 ---
 
@@ -9,9 +9,9 @@
 
 Commission-free QR menu + table-side ordering SaaS for independent Indian cafes.
 Customer scans table QR → menu → cart → order (cash or UPI via Razorpay) → kitchen print.
-Three surfaces: customer app (`/{cafeSlug}`), owner dashboard (`/owner/*`), founder admin portal (`/admin/*`).
+Four surfaces: **marketing site (`/`, brand working title "OrderLy" — constants in `src/lib/brand.ts`)**, customer app (`/{cafeSlug}`), owner dashboard (`/owner/*`), founder admin portal (`/admin/*`).
 
-**Spec documents (repo root):** `PRD_Cafe_QR_Ordering_Platform.md` · `Technical_Architecture_Document.md` · `Security_Access_Document.md` · `DESIGN_SYSTEM.md` · `BUILD_PLAN.md` (the milestone roadmap M0–M12 this file tracks against).
+**Spec documents (repo root):** `PRD_Cafe_QR_Ordering_Platform.md` · `Technical_Architecture_Document.md` · `Security_Access_Document.md` · `DESIGN_SYSTEM.md` · `BUILD_PLAN.md` (the milestone roadmap M0–M13 this file tracks against; M13 = marketing site, added by founder 2026-07-05).
 
 **Stack:** Next.js 16 (App Router, `proxy.ts` replaces middleware) · TypeScript · Tailwind v4 · Prisma 7 (pg driver adapter; URLs in `prisma.config.ts`, NOT in schema) · Postgres (local Docker now, Supabase later) · Razorpay. App lives in `cafe-platform/`.
 
@@ -126,8 +126,9 @@ Three surfaces: customer app (`/{cafeSlug}`), owner dashboard (`/owner/*`), foun
 
 ## Blocked on the founder (user) — needed before their milestones
 
-1. **Supabase project** (needed by M7 realtime + storage in M6 photo upload): create at supabase.com → fill `DATABASE_URL`, `DIRECT_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` in `.env` → `npm run db:deploy` → paste `prisma/rls/001_rls_policies.sql` in SQL editor → `npm run db:seed`.
+1. **Supabase project** (needed by M7 realtime; photo storage now optional — local-disk driver works): create at supabase.com → fill `DATABASE_URL`, `DIRECT_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` in `.env` → `npm run db:deploy` → paste `prisma/rls/001_rls_policies.sql` in SQL editor (⚠️ add a deny-anon policy for the new `leads` table first) → `npm run db:seed`.
 2. **Razorpay test keys** (finishes M5 e2e): dashboard → test mode → `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`; webhook: point a tunnel (e.g. `ngrok`) at `/api/payments/razorpay-webhook`, set `RAZORPAY_WEBHOOK_SECRET` to the dashboard value, subscribe to `payment.captured` + `order.paid`. Then test the browser-closed-mid-payment scenario (BUILD_PLAN M5 done-when).
+3. **Final brand name + real contact number** (marketing site ships with working title "OrderLy" and placeholder `+91 99999 00000`): both live only in `cafe-platform/src/lib/brand.ts` — one edit swaps the whole site, WhatsApp link included.
 
 ---
 
@@ -136,7 +137,7 @@ Three surfaces: customer app (`/{cafeSlug}`), owner dashboard (`/owner/*`), foun
 **M7 Realtime popup + sound** — BLOCKED on Supabase project (realtime subscription on `orders` inserts). If keys still missing, do **M8 print relay first** (LAN ESC/POS over TCP 9100, mockable locally), or M9 QR gen / M10 admin portal — none need Supabase.
 1. M7: `hooks/useRealtimeOrders.ts`, full-screen takeover + loud sound "New Order #1024 — Table 5", feed + Home totals update without refresh, graceful reconnect. Replaces the 8s poll in `OrdersFeed`.
 2. M8: `lib/print-relay.ts`, KOT without customer phone, `print_status` lifecycle, failed → loud dashboard alert.
-3. M9 QR gen (admin), M10 admin portal (reconcile button exists), M11 cron, M12 hardening/deploy per BUILD_PLAN.
-4. Menu photo upload: swap URL-field stub for Supabase Storage upload once keys exist (M6 leftover).
+3. M9 QR gen (admin), M10 admin portal (reconcile button exists; **now also a leads list view** from the M13 marketing site), M11 cron, M12 hardening/deploy per BUILD_PLAN.
+4. Photo upload done (local-disk driver). At Supabase-swap time: reimplement `saveMenuPhoto()` in `src/lib/storage.ts` against Supabase Storage — callers unchanged.
 
 **Session workflow notes:** caveman mode active (user preference); commit per milestone with verification notes; verify each milestone with a driven browser/API test before marking done.
