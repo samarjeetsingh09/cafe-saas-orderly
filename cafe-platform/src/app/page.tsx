@@ -12,6 +12,7 @@ import { Reveal } from "@/components/marketing/Reveal";
 import { SiteHeader } from "@/components/marketing/SiteHeader";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { Icon, ViewfinderCorner, D } from "@/components/marketing/icons";
+import TextType from "@/components/marketing/TextType";
 
 export const metadata = {
   title: `${BRAND_NAME} — QR menu & table ordering for cafes, zero commission`,
@@ -48,10 +49,10 @@ const STEPS = [
 const STEP_ICONS = [D.phone, D.printer, D.qr] as const;
 
 const USE_CASES = [
-  { label: "Cafes", icon: D.cup },
-  { label: "Quick-service restaurants", icon: D.bolt },
-  { label: "Bakeries & dessert bars", icon: D.cupcake },
-  { label: "Food courts", icon: D.cutlery },
+  { label: "Cafes", icon: D.cup, image: "/images/cafe-interior.jpg" },
+  { label: "Quick-service restaurants", icon: D.bolt, image: "/images/quick-service-interior.jpg" },
+  { label: "Bakeries & dessert bars", icon: D.cupcake, image: "/images/bakery-dessert.jpg" },
+  { label: "Food courts", icon: D.cutlery, image: "/images/food-court.jpg" },
 ] as const;
 
 const WHY_CARDS = [
@@ -95,7 +96,19 @@ export default function LandingPage() {
             The hero's argument is the product itself: the right column is a
             working replica of the customer menu, wearing the site's own
             palette. Visitors are meant to poke at it. ──────────────────── */}
-        <section className="relative overflow-hidden">
+        <section className="relative isolate overflow-hidden">
+          <div className="absolute inset-0 -z-10">
+            <video
+              className="h-full w-full object-cover"
+              src="/videos/hero-bg.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/55" />
+          </div>
+
           <div className="mx-auto grid max-w-6xl items-center gap-16 px-4 pt-14 pb-20 sm:px-6 lg:grid-cols-[1fr_auto] lg:gap-14 lg:pt-20 lg:pb-28">
             <Reveal variant="left">
               <span className="inline-flex items-center gap-2 rounded-full border border-dashed border-primary/40 bg-surface px-3 py-1 font-mono text-[11px] font-semibold tracking-[0.14em] text-primary uppercase">
@@ -144,8 +157,10 @@ export default function LandingPage() {
               </dl>
             </Reveal>
 
-            <Reveal delayMs={120} variant="scale">
-              <div className="relative mx-auto w-fit">
+            {/* Plain on-load CSS animation (not scroll-triggered like Reveal)
+                so the phone visibly slides in from off-screen the moment the
+                hero paints. */}
+            <div className="phone-slide-in relative mx-auto w-fit">
                 {/* Warm light pooled behind the phone so the artefact sits in
                     the page rather than on it. */}
                 <div
@@ -181,13 +196,19 @@ export default function LandingPage() {
                 <p className="mt-5 text-center font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
                   The real menu screen — go on, tap it
                 </p>
-              </div>
-            </Reveal>
+            </div>
           </div>
         </section>
 
         {/* ── Commission math (signature band) ────────────────────────── */}
-        <section aria-label="Commission comparison" className="chit-edge-b on-dark bg-[#2b2016] py-24 text-white">
+        <section aria-label="Commission comparison" className="chit-edge-b on-dark isolate overflow-hidden bg-[#2b2016] py-24 text-white">
+          <img
+            src="/images/coffee-beans-bg.jpg"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 h-full w-full scale-110 object-cover opacity-40 blur-sm"
+          />
+
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <Reveal>
               <p className="font-mono text-[11px] font-semibold tracking-[0.14em] text-accent uppercase">The math your cafe feels</p>
@@ -212,7 +233,16 @@ export default function LandingPage() {
                   </dl>
                   <div className="mt-4 flex items-baseline justify-between border-t border-dashed border-white/25 pt-4">
                     <span className="font-mono text-sm text-white/60">You receive</span>
-                    <span className="font-mono text-3xl font-bold tabular-nums">₹375</span>
+                    <TextType
+                      as="span"
+                      className="font-mono text-3xl font-bold tabular-nums"
+                      text={["₹375"]}
+                      loop={false}
+                      showCursor
+                      cursorCharacter="_"
+                      typingSpeed={200}
+                      startOnVisible
+                    />
                   </div>
                 </div>
               </Reveal>
@@ -236,7 +266,16 @@ export default function LandingPage() {
                   </dl>
                   <div className="mt-4 flex items-baseline justify-between border-t border-dashed border-accent/40 pt-4">
                     <span className="font-mono text-sm text-white/60">You receive</span>
-                    <span className="font-mono text-3xl font-bold text-accent tabular-nums">₹500</span>
+                    <TextType
+                      as="span"
+                      className="font-mono text-3xl font-bold text-accent tabular-nums"
+                      text={["₹500"]}
+                      loop={false}
+                      showCursor
+                      cursorCharacter="_"
+                      typingSpeed={200}
+                      startOnVisible
+                    />
                   </div>
                 </div>
               </Reveal>
@@ -295,9 +334,9 @@ export default function LandingPage() {
                 <div className="group relative mx-auto max-w-sm lg:max-w-none">
                   <div
                     aria-hidden="true"
-                    className="absolute -top-5 -right-4 h-full w-full rotate-2 rounded-[2rem] bg-accent transition-transform duration-500 ease-out group-hover:rotate-3 group-hover:-translate-y-1 sm:-top-7 sm:-right-6"
+                    className="absolute -top-5 -right-4 h-full w-full rotate-2 rounded-[2rem] bg-[url('/images/steps-card-pattern.jpg')] bg-cover bg-center transition-transform duration-500 ease-out group-hover:translate-x-1.5 group-hover:-translate-y-2 group-hover:rotate-3 sm:-top-7 sm:-right-6"
                   />
-                  <div className="relative flex aspect-[4/5] flex-col justify-between overflow-hidden rounded-[1.75rem] border border-primary/20 bg-primary p-7 text-white shadow-xl transition-transform duration-500 ease-out group-hover:-translate-y-1.5 sm:p-8">
+                  <div className="relative flex aspect-[4/5] flex-col justify-between overflow-hidden rounded-[1.75rem] border border-primary/20 bg-primary p-7 text-white shadow-xl transition-transform duration-500 ease-out group-hover:-translate-x-1.5 group-hover:translate-y-1.5 sm:p-8">
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-[11px] font-semibold tracking-widest text-white/60 uppercase">Table 05</span>
                       <ViewfinderCorner className="h-4 w-4 text-white/40" />
@@ -426,10 +465,12 @@ export default function LandingPage() {
               {USE_CASES.map((u, i) => (
                 <Reveal key={u.label} delayMs={i * 70} variant="scale">
                   <div className="group h-full overflow-hidden rounded-2xl border border-border bg-background shadow-sm transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-primary/25 hover:shadow-lg hover:shadow-primary/10">
-                    <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10 transition-colors duration-300 ease-out group-hover:from-primary/15 group-hover:to-accent/15">
-                      <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/15 bg-surface text-primary shadow-sm transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-105">
-                        <Icon d={u.icon} className="h-7 w-7" />
-                      </span>
+                    <div className="relative aspect-[4/3] overflow-hidden">
+                      <img
+                        src={u.image}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+                      />
                     </div>
                     <p className="p-4 text-center text-base font-semibold text-foreground">{u.label}</p>
                   </div>
