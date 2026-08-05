@@ -2,30 +2,30 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import {
-  ADMIN_COOKIE,
   DUMMY_BCRYPT_HASH,
+  PLATFORM_COOKIE,
   sessionCookieOptions,
-  signAdminToken,
+  signPlatformToken,
   verifyPassword,
 } from "@/lib/auth";
 import { isLocked, recordFailure, recordSuccess } from "@/lib/rate-limit";
 
-/** Founder/admin login — separate flow and cookie from owner login. */
+/** HQ/platform staff login — fully separate flow, cookie and table from cafe staff login. */
 export async function POST(request: Request) {
-  let body: { phone?: unknown; password?: unknown };
+  let body: { email?: unknown; password?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (!phone || !password) {
-    return NextResponse.json({ error: "Phone and password are required" }, { status: 400 });
+  if (!email || !password) {
+    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
   }
 
-  const lockKey = `admin:${phone}`;
+  const lockKey = `platform:${email}`;
   if (isLocked(lockKey)) {
     return NextResponse.json(
       { error: "Too many failed attempts. Please try again in a few minutes." },
@@ -33,16 +33,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const admin = await prisma.admin.findUnique({ where: { phone } });
-  const passwordOk = await verifyPassword(password, admin?.passwordHash ?? DUMMY_BCRYPT_HASH);
+  const user = await prisma.platformUser.findUnique({ where: { email } });
+  const passwordOk = await verifyPassword(password, user?.passwordHash ?? DUMMY_BCRYPT_HASH);
 
-  if (!admin || !passwordOk) {
+  if (!user || !passwordOk || !user.active) {
     recordFailure(lockKey);
-    return NextResponse.json({ error: "Invalid phone or password" }, { status: 401 });
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
   recordSuccess(lockKey);
   const cookieStore = await cookies();
-  cookieStore.set(ADMIN_COOKIE, signAdminToken(admin.id, admin.role), sessionCookieOptions());
-  return NextResponse.json({ ok: true, name: admin.name });
+  cookieStore.set(PLATFORM_COOKIE, signPlatformToken(user.id, user.role), sessionCookieOptions());
+  await prisma.platformUser.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  return NextResponse.json({ ok: true, fullName: user.fullName });
 }

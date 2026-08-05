@@ -1,0 +1,758 @@
+/*
+ * Hero menu preview — the customer ordering screen, wearing the marketing
+ * site's own warm palette instead of the ordering app's dark botanical one.
+ *
+ * Deliberate split: `/t/[token]` (and so `/demo`, which is Bëlla) keeps the
+ * green/gold theme it was designed in — that's the cafe's own branding and
+ * what gets shown to Bëlla. The landing hero is OrderLy's shop window, so
+ * the preview here is cream/brown/amber like the rest of the site, and
+ * borrows the paper-trail motif (dashed rules, mono tabular figures).
+ *
+ * Tokens are namespaced `--mp-*` and declared on `.menu-phone`, never on
+ * `:root`: styles/tokens.css puts `--bg`/`--surface`/`--accent` on `:root`
+ * and globals.css puts marketing tokens of the same names there too, so a
+ * shared name would put the two palettes in a fight. Typography reuses the
+ * root layout's already-loaded faces — no extra font downloads.
+ *
+ * Everything positions inside the frame (`absolute`, not `fixed`): cart bar,
+ * scrim and sheet are clipped by the phone, not the viewport.
+ */
+
+.menu-phone {
+  --mp-bg: #fff8f1;
+  --mp-surface: #ffffff;
+  --mp-ink: #2b2b2b;
+  --mp-ink-dim: #6b7280;
+  --mp-ink-faint: #9ca3af;
+  --mp-line: rgba(124, 63, 0, 0.14);
+  --mp-primary: #7c3f00;
+  --mp-accent: #d97706;
+  --mp-accent-soft: rgba(217, 119, 6, 0.1);
+  /* Legible amber for small text sitting on the brown header. */
+  --mp-accent-on-dark: #f0b45f;
+  --mp-veg: #16a34a;
+  --mp-nonveg: #dc2626;
+
+  --mp-display: var(--font-fraunces), Georgia, serif;
+  --mp-body: var(--font-geist-sans), system-ui, sans-serif;
+  --mp-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  font-family: var(--mp-body);
+  color: var(--mp-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.menu-phone *,
+.menu-phone *::before,
+.menu-phone *::after {
+  box-sizing: border-box;
+}
+
+/* Zero-specificity reset (`:where`) so every component class below wins
+   without having to out-specify it — a plain `.menu-phone button` would
+   beat `.mp-add`'s own padding and border. */
+:where(.menu-phone) :where(button) {
+  font-family: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.menu-phone :focus-visible {
+  outline: 2px solid var(--mp-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- frame ---------- */
+.mp-frame {
+  position: relative;
+  width: 300px;
+  max-width: 100%;
+  padding: 7px;
+  border-radius: 2.6rem;
+  background: linear-gradient(160deg, #4a2c11, #2f1c0c 55%, #4a2c11);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 32px 60px -24px rgba(56, 30, 8, 0.5),
+    0 12px 24px -12px rgba(56, 30, 8, 0.3);
+}
+
+.mp-screen {
+  position: relative;
+  isolation: isolate;
+  height: 548px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 2.1rem;
+  background: var(--mp-bg);
+}
+
+/* ---------- status strip ---------- */
+.mp-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 18px 2px;
+  background: var(--mp-primary);
+  font-family: var(--mp-mono);
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  color: rgba(255, 248, 241, 0.55);
+}
+.mp-status .mp-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.mp-status .mp-bars i {
+  display: block;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(255, 248, 241, 0.45);
+}
+.mp-status .mp-bars i:nth-child(1) { height: 3px; }
+.mp-status .mp-bars i:nth-child(2) { height: 5px; }
+.mp-status .mp-bars i:nth-child(3) { height: 7px; }
+.mp-status .mp-bars i:nth-child(4) { height: 9px; background: var(--mp-accent-on-dark); }
+
+/* ---------- header ---------- */
+.mp-head {
+  padding: 6px 14px 14px;
+  text-align: center;
+  background: var(--mp-primary);
+  color: #fff8f1;
+}
+.mp-brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.mp-brand-mark svg {
+  width: 20px;
+  height: 20px;
+  color: var(--mp-accent-on-dark);
+}
+.mp-brand {
+  font-family: var(--mp-display);
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.mp-brand-sub {
+  margin-top: 5px;
+  font-family: var(--mp-mono);
+  font-size: 7.5px;
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+  color: rgba(255, 248, 241, 0.6);
+}
+
+/* ---------- kitchen switch ---------- */
+.mp-switch {
+  position: relative;
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 3px;
+  border: 1px solid rgba(255, 248, 241, 0.22);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+}
+.mp-switch .mp-glide {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  border: 1px solid var(--mp-accent-on-dark);
+  background: rgba(217, 119, 6, 0.28);
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mp-switch[data-side="nonveg"] .mp-glide {
+  transform: translateX(100%);
+}
+.mp-switch button {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 94px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-family: var(--mp-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(255, 248, 241, 0.62);
+  transition: color 0.25s ease;
+}
+.mp-switch button[aria-pressed="true"] {
+  color: #fff8f1;
+}
+
+.mp-table-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 11px;
+  padding: 4px 11px;
+  border: 1px dashed rgba(255, 248, 241, 0.3);
+  border-radius: 999px;
+  font-family: var(--mp-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+  color: rgba(255, 248, 241, 0.72);
+}
+.mp-table-chip b {
+  color: var(--mp-accent-on-dark);
+  font-weight: 700;
+}
+.mp-live {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #6ee7a5;
+  animation: mp-pulse 2.4s ease-out infinite;
+}
+@keyframes mp-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(110, 231, 165, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(110, 231, 165, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(110, 231, 165, 0); }
+}
+
+/* ---------- scroll body ---------- */
+.mp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  border-top: 1px dashed rgba(255, 248, 241, 0.5);
+}
+.mp-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- categories ----------
+   Fixed row, never a scroller. The rail used to overflow the 300px screen
+   and read as content running off the edge; the tiles now share the width
+   (`flex: 1`) and are capped, so three or two both sit centred. */
+.mp-cats {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 14px 2px;
+}
+.mp-cat {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 92px;
+  text-align: center;
+}
+.mp-cat-art {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mp-line);
+  border-radius: 12px;
+  background: var(--mp-surface);
+  color: var(--mp-ink-dim);
+  box-shadow: 0 1px 2px rgba(56, 30, 8, 0.05);
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.25s ease,
+    color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.mp-cat-art svg {
+  width: 34px;
+  height: 34px;
+}
+/* Named, not `.mp-cat span` — that would also match `.mp-cat-art` (also a
+   span) and flatten its flex centring to `display: block`. */
+.mp-cat-label {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--mp-mono);
+  font-size: 8px;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--mp-ink-dim);
+  transition: color 0.25s ease;
+}
+.mp-cat[aria-selected="true"] .mp-cat-art {
+  border-color: var(--mp-accent);
+  background: var(--mp-accent-soft);
+  color: var(--mp-primary);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 18px -8px rgba(124, 63, 0, 0.35);
+}
+.mp-cat[aria-selected="true"] .mp-cat-label {
+  color: var(--mp-primary);
+  font-weight: 600;
+}
+
+/* ---------- section rule ---------- */
+.mp-script-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 14px 0;
+}
+.mp-script-head .mp-rule {
+  flex: 1;
+  border-top: 1px dashed var(--mp-line);
+}
+.mp-script-head h3 {
+  margin: 0;
+  font-family: var(--mp-display);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: var(--mp-ink);
+}
+
+/* ---------- dishes ---------- */
+.mp-dishes {
+  padding: 0 14px;
+}
+.mp-dish {
+  display: flex;
+  gap: 11px;
+  padding: 13px 0;
+  border-bottom: 1px dashed var(--mp-line);
+}
+.mp-dish:last-child {
+  border-bottom: 0;
+}
+.mp-dish-art {
+  flex: 0 0 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mp-line);
+  border-radius: 10px;
+  background: var(--mp-surface);
+  color: var(--mp-ink-faint);
+}
+.mp-dish-art svg {
+  width: 28px;
+  height: 28px;
+}
+.mp-dish-body {
+  flex: 1;
+  min-width: 0;
+}
+.mp-dish-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mp-dish-title h4 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--mp-ink);
+}
+.mp-dot {
+  position: relative;
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.4px solid var(--mp-veg);
+  border-radius: 2.5px;
+  transform: translateY(1px);
+}
+.mp-dot::after {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  border-radius: 50%;
+  background: var(--mp-veg);
+}
+.mp-dot.nv {
+  border-color: var(--mp-nonveg);
+}
+.mp-dot.nv::after {
+  background: var(--mp-nonveg);
+}
+/* On the brown header the veg/non-veg marks need a light frame to read. */
+.mp-switch .mp-dot {
+  border-color: #6ee7a5;
+}
+.mp-switch .mp-dot::after {
+  background: #6ee7a5;
+}
+.mp-switch .mp-dot.nv {
+  border-color: #f0907c;
+}
+.mp-switch .mp-dot.nv::after {
+  background: #f0907c;
+}
+.mp-tag {
+  padding: 1px 5px;
+  border: 1px dashed rgba(124, 63, 0, 0.35);
+  border-radius: 4px;
+  font-family: var(--mp-mono);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--mp-primary);
+}
+.mp-dish p {
+  margin: 4px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--mp-ink-dim);
+}
+.mp-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.mp-size {
+  padding: 3px 9px;
+  border: 1px solid var(--mp-line);
+  border-radius: 999px;
+  background: var(--mp-surface);
+  font-family: var(--mp-mono);
+  font-size: 9px;
+  color: var(--mp-ink-dim);
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background-color 0.2s ease;
+}
+.mp-size[aria-pressed="true"] {
+  border-color: var(--mp-accent);
+  background: var(--mp-accent-soft);
+  color: var(--mp-primary);
+  font-weight: 600;
+}
+.mp-price {
+  margin-top: 8px;
+  font-family: var(--mp-mono);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mp-primary);
+}
+.mp-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  padding: 6px 14px;
+  border: 1px solid var(--mp-accent);
+  border-radius: 999px;
+  font-family: var(--mp-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--mp-primary);
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease;
+}
+.mp-add:hover {
+  background: var(--mp-accent-soft);
+}
+.mp-add:active {
+  transform: scale(0.97);
+}
+.mp-soldout {
+  margin-top: 9px;
+  font-family: var(--mp-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--mp-ink-faint);
+}
+.mp-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 9px;
+  padding: 3px 10px;
+  border: 1px solid var(--mp-accent);
+  border-radius: 999px;
+  background: var(--mp-accent-soft);
+}
+.mp-stepper button {
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 3px;
+  color: var(--mp-primary);
+}
+.mp-stepper span {
+  min-width: 12px;
+  text-align: center;
+  font-family: var(--mp-mono);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--mp-primary);
+}
+
+.mp-foot-note {
+  padding: 12px 14px 22px;
+  text-align: center;
+  font-family: var(--mp-mono);
+  font-size: 8px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--mp-ink-faint);
+}
+
+/* ---------- cart bar ---------- */
+.mp-cartbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(255, 248, 241, 0), rgba(255, 248, 241, 0.96) 45%);
+  transform: translateY(140%);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mp-cartbar.show {
+  transform: translateY(0);
+}
+.mp-cartbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--mp-primary);
+  color: #fff8f1;
+  box-shadow: 0 14px 28px -12px rgba(56, 30, 8, 0.55);
+  transition: transform 0.2s ease;
+}
+.mp-cartbar-inner:hover {
+  transform: translateY(-1px);
+}
+.mp-cartbar-inner small {
+  display: block;
+  font-family: var(--mp-mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255, 248, 241, 0.62);
+}
+.mp-cartbar-inner strong {
+  font-family: var(--mp-mono);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mp-cartbar-inner .mp-go {
+  font-family: var(--mp-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--mp-accent-on-dark);
+}
+
+/* ---------- sheet ---------- */
+.mp-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: rgba(43, 32, 22, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.mp-scrim.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mp-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  max-height: 92%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 6px 16px 20px;
+  border-top: 1px solid var(--mp-line);
+  border-radius: 20px 20px 0 0;
+  background: var(--mp-surface);
+  box-shadow: 0 -18px 40px -18px rgba(56, 30, 8, 0.45);
+  transform: translateY(100%);
+  transition: transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mp-sheet::-webkit-scrollbar {
+  display: none;
+}
+.mp-sheet.show {
+  transform: translateY(0);
+}
+.mp-grab {
+  width: 36px;
+  height: 4px;
+  margin: 6px auto 2px;
+  border-radius: 999px;
+  background: var(--mp-line);
+}
+.mp-sheet h3 {
+  margin: 6px 0 12px;
+  font-family: var(--mp-display);
+  font-size: 20px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: -0.01em;
+  color: var(--mp-ink);
+}
+.mp-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--mp-line);
+}
+.mp-line .mp-nm {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mp-ink);
+}
+.mp-line .mp-sz {
+  margin-top: 2px;
+  font-family: var(--mp-mono);
+  font-size: 8.5px;
+  color: var(--mp-ink-dim);
+}
+.mp-line .mp-amt {
+  font-family: var(--mp-mono);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--mp-primary);
+}
+.mp-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--mp-line);
+  border-radius: 999px;
+}
+.mp-mini button {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--mp-primary);
+}
+.mp-mini span {
+  min-width: 10px;
+  text-align: center;
+  font-family: var(--mp-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mp-ink);
+}
+.mp-totals {
+  padding: 10px 0 2px;
+  font-family: var(--mp-mono);
+  font-size: 10px;
+}
+.mp-totals div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  color: var(--mp-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+.mp-totals .mp-grand {
+  margin-top: 5px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--mp-line);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--mp-ink);
+}
+.mp-totals .mp-grand span:last-child {
+  color: var(--mp-primary);
+}
+.mp-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 11px;
+  background: var(--mp-primary);
+  color: #fff8f1;
+  font-family: var(--mp-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.mp-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px -10px rgba(56, 30, 8, 0.6);
+}
+.mp-sheet-note {
+  margin: 9px 0 0;
+  text-align: center;
+  font-size: 9px;
+  line-height: 1.6;
+  color: var(--mp-ink-faint);
+}
+
+/* On a phone, a scrollable panel inside the hero steals the page scroll the
+   moment a thumb lands on it. Below `sm` the screen grows to its content
+   instead and the page does the scrolling. */
+@media (max-width: 639px) {
+  .mp-screen {
+    height: auto;
+  }
+  .mp-body {
+    overflow: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-phone *,
+  .menu-phone *::before,
+  .menu-phone *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

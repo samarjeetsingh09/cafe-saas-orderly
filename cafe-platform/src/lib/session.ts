@@ -1,47 +1,57 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
-import { ADMIN_COOKIE, OWNER_COOKIE, verifyAdminToken, verifyOwnerToken } from "@/lib/auth";
-import type { Cafe, Admin } from "@prisma/client";
+import { PLATFORM_COOKIE, PROFILE_COOKIE, verifyPlatformToken, verifyProfileToken } from "@/lib/auth";
+import type { Profile, PlatformUser, Tenant } from "@prisma/client";
 
 /**
- * Per-request session resolution for server components and API routes.
- * This is the belt on top of the proxy's suspenders: it re-reads the cafe row
- * so a deactivated cafe's still-unexpired JWT is rejected on its next request
- * (BUILD_PLAN M2 session-invalidation requirement).
+ * Per-request session resolution for server components and API routes
+ * (Phase C rewrite). This is the belt on top of proxy.ts's suspenders: it
+ * re-reads the profile/tenant row so a deactivated staff account or a
+ * cancelled tenant's still-unexpired JWT is rejected on its next request.
  */
 
-export async function getOwnerCafe(): Promise<Cafe | null> {
+export type ProfileSession = Profile & { tenant: Tenant; impersonatedBy: string | null };
+
+/** Cached per-request: layout and page both call this without a double DB round-trip. */
+export const getProfile = cache(async (): Promise<ProfileSession | null> => {
   const cookieStore = await cookies();
-  const token = cookieStore.get(OWNER_COOKIE)?.value;
+  const token = cookieStore.get(PROFILE_COOKIE)?.value;
   if (!token) return null;
-  const claims = verifyOwnerToken(token);
+  const claims = verifyProfileToken(token);
   if (!claims) return null;
 
-  const cafe = await prisma.cafe.findUnique({ where: { id: claims.cafe_id } });
-  if (!cafe || cafe.subscriptionStatus === "disabled") return null;
-  return cafe;
-}
+  const profile = await prisma.profile.findUnique({
+    where: { id: claims.profile_id },
+    include: { tenant: true },
+  });
+  if (!profile || !profile.active) return null;
+  if (profile.tenant.status === "cancelled") return null;
+  return { ...profile, impersonatedBy: claims.impersonated_by ?? null };
+});
 
-export async function getAdmin(): Promise<Admin | null> {
+export async function getPlatformUser(): Promise<PlatformUser | null> {
   const cookieStore = await cookies();
-  const token = cookieStore.get(ADMIN_COOKIE)?.value;
+  const token = cookieStore.get(PLATFORM_COOKIE)?.value;
   if (!token) return null;
-  const claims = verifyAdminToken(token);
+  const claims = verifyPlatformToken(token);
   if (!claims) return null;
-  return prisma.admin.findUnique({ where: { id: claims.admin_id } });
+  const user = await prisma.platformUser.findUnique({ where: { id: claims.platform_user_id } });
+  if (!user || !user.active) return null;
+  return user;
 }
 
 /** Throwing variants for API routes — catch and map to 401. */
 export class UnauthorizedError extends Error {}
 
-export async function requireOwner(): Promise<Cafe> {
-  const cafe = await getOwnerCafe();
-  if (!cafe) throw new UnauthorizedError("Owner session required");
-  return cafe;
+export async function requireProfile(): Promise<ProfileSession> {
+  const profile = await getProfile();
+  if (!profile) throw new UnauthorizedError("Staff session required");
+  return profile;
 }
 
-export async function requireAdmin(): Promise<Admin> {
-  const admin = await getAdmin();
-  if (!admin) throw new UnauthorizedError("Admin session required");
-  return admin;
+export async function requirePlatformUser(): Promise<PlatformUser> {
+  const user = await getPlatformUser();
+  if (!user) throw new UnauthorizedError("Platform session required");
+  return user;
 }

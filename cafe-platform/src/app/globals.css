@@ -32,11 +32,16 @@
   --color-info: var(--info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces);
 }
 
 body {
   background: var(--background);
   color: var(--text);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 /* Bottom-sheet entrance (owner More sheet, etc.) — gated by motion-safe: */
@@ -48,5 +53,262 @@ body {
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+/* ── Marketing site: "paper trail" motif ─────────────────────────────
+   OrderLy's product already speaks in tickets and receipts (KOT slips,
+   the perforated order-confirmation card). The landing page borrows that
+   vocabulary — die-cut edges, tabular mono figures, a rubber-stamp mark —
+   instead of generic SaaS card chrome. */
+
+/* One-time scroll reveal. JS toggles .is-in; no repeat, no loop.
+   `data-v` picks the direction so a section can be choreographed (copy
+   arrives from the left, the artefact beside it settles in) instead of
+   every block doing the identical rise. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.55s ease-out,
+    transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.reveal[data-v="left"] {
+  transform: translateX(-22px);
+}
+.reveal[data-v="right"] {
+  transform: translateX(22px);
+}
+.reveal[data-v="scale"] {
+  transform: scale(0.965);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Motion kit ───────────────────────────────────────────────────────
+   Small, named behaviours the landing page composes. Everything here is
+   decorative: each one is switched off wholesale under
+   prefers-reduced-motion at the bottom of this file. */
+
+/* Paper chits breathing on the board. Animates `translate`, not
+   `transform`, so it composes with Tailwind's rotate utilities instead of
+   overwriting them. */
+@keyframes mk-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -7px;
+  }
+}
+.float-slow {
+  animation: mk-float 6s ease-in-out infinite;
+}
+.float-slower {
+  animation: mk-float 7.5s ease-in-out 0.9s infinite;
+}
+
+/* A light bar passing down the phone once on load — the product's own
+   gesture (a code being scanned), not a generic shimmer. */
+@keyframes mk-scan {
+  0% {
+    translate: 0 -55%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    translate: 0 55%;
+    opacity: 0;
+  }
+}
+.scan-sweep {
+  position: relative;
+}
+.scan-sweep::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  z-index: 30;
+  border-radius: 2.8rem;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 44%,
+    rgba(217, 119, 6, 0.32) 50%,
+    transparent 56%
+  );
+  animation: mk-scan 2.4s cubic-bezier(0.4, 0, 0.3, 1) 0.6s 1 both;
+}
+
+/* Warm light pooling behind the hero artefact. */
+@keyframes mk-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    scale: 1;
+  }
+  50% {
+    opacity: 0.8;
+    scale: 1.06;
+  }
+}
+.glow-pool {
+  animation: mk-breathe 9s ease-in-out infinite;
+}
+
+/* Sheen across a solid CTA on hover. */
+@keyframes mk-sheen {
+  from {
+    translate: -160% 0;
+    opacity: 1;
+  }
+  to {
+    translate: 420% 0;
+    opacity: 0;
+  }
+}
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 34%;
+  pointer-events: none;
+  opacity: 0;
+  transform: skewX(-18deg);
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+}
+.sheen:hover::after,
+.sheen:focus-visible::after {
+  animation: mk-sheen 0.8s ease-out;
+}
+
+/* A rule that draws itself once its row scrolls in — used for the struck
+   commission figure, so the deduction is something you watch happen. */
+.strike-draw {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 0% 1.5px;
+  transition: background-size 0.6s ease-out 0.35s;
+}
+.is-in .strike-draw {
+  background-size: 100% 1.5px;
+}
+
+/* Reading-progress hairline under the sticky header. Scroll-driven, so it
+   costs no JS — and it is only ever switched on where the browser actually
+   supports the timeline, otherwise the bar stays at zero width instead of
+   snapping to full. */
+.scroll-progress {
+  transform-origin: 0 50%;
+  scale: 0 1;
+}
+@supports (animation-timeline: scroll()) {
+  @keyframes mk-progress {
+    to {
+      scale: 1 1;
+    }
+  }
+  .scroll-progress {
+    animation: mk-progress linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+
+/* Nav links: a rule that grows from the left on hover. */
+.nav-underline {
+  position: relative;
+}
+.nav-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 1.5px;
+  background: var(--accent);
+  transform-origin: 0 50%;
+  scale: 0 1;
+  transition: scale 0.25s ease-out;
+}
+.nav-underline:hover::after,
+.nav-underline:focus-visible::after {
+  scale: 1 1;
+}
+
+/* Die-cut / perforated edge, used where one "ticket" meets the next. */
+.chit-edge-b {
+  border-bottom: 1px dashed var(--border);
+  position: relative;
+}
+.chit-edge-b::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 9px;
+  background-image: radial-gradient(circle, var(--background) 3.5px, transparent 3.6px);
+  background-size: 18px 9px;
+  background-repeat: repeat-x;
+  background-position: center top;
+  pointer-events: none;
+}
+.chit-edge-b.on-dark {
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Rubber-stamp badge (rotated, double ring) */
+.stamp {
+  display: inline-flex;
+  transform: rotate(-4deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  /* Every decorative behaviour above is optional by design — switch the
+     whole kit off rather than trying to tone each one down. */
+  .float-slow,
+  .float-slower,
+  .glow-pool,
+  .scroll-progress,
+  .sheen:hover::after,
+  .sheen:focus-visible::after {
+    animation: none;
+  }
+  .scan-sweep::after {
+    display: none;
+  }
+  .scroll-progress {
+    scale: 1 1;
+    opacity: 0.35;
+  }
+  .strike-draw {
+    background-size: 100% 1.5px;
+    transition: none;
+  }
+  .nav-underline::after {
+    transition: none;
   }
 }

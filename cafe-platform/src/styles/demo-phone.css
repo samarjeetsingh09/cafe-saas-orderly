@@ -1,0 +1,213 @@
+/*
+ * /demo — the *real* customer ordering app, running inside a phone.
+ *
+ * The landing hero (styles/menu-phone.css) fakes a menu at 300px so the
+ * marketing palette can wear it. This is the opposite: the screen here is a
+ * same-origin <iframe> of `/t/{qrToken}`, so what's inside is the genuine
+ * app on a genuine table, wearing that cafe's own theme. Nothing about the
+ * ordering app is restyled from out here — the frame only supplies bezel,
+ * shadow and a device-sized viewport.
+ *
+ * The bezel deliberately reuses the hero's `.mp-frame` language (same brown
+ * gradient, same inset highlight) so the two phones on the site read as the
+ * same object at two sizes.
+ *
+ * Tokens are namespaced `--dp-*` and declared on `.demo-phone`, never on
+ * `:root` — globals.css and styles/tokens.css both own root-level names.
+ */
+
+.demo-phone {
+  /* Two different sizes, on purpose:
+     `--dp-w`/`--dp-h` are how big the screen *looks* in the frame, and
+     `--dp-scale` is how much the app inside is shrunk to get there — so the
+     app actually lays itself out at `--dp-w / --dp-scale` ≈ 430px, a real
+     large-phone viewport, and is then displayed a little under life size.
+     That keeps the layout honest (no breakpoint the app wouldn't really hit)
+     while making its 52px cafe name read as menu-in-a-frame rather than
+     shouting out of it. Nudge only `--dp-scale` to retune this. */
+  --dp-w: 360px;
+  --dp-h: 634px;
+  --dp-scale: 0.84;
+  --dp-bezel: 10px;
+  --dp-radius: 2.9rem;
+  --dp-status-h: 30px;
+  /* Same brown as the hero phone's header (menu-phone.css `--mp-primary`). */
+  --dp-chrome: #7c3f00;
+
+  position: relative;
+  width: calc(var(--dp-w) + var(--dp-bezel) * 2);
+  max-width: 100%;
+  padding: var(--dp-bezel);
+  border-radius: var(--dp-radius);
+  background: linear-gradient(160deg, #4a2c11, #2f1c0c 55%, #4a2c11);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 40px 80px -30px rgba(56, 30, 8, 0.55),
+    0 16px 32px -16px rgba(56, 30, 8, 0.35);
+}
+
+/* Side buttons — volume pair on the left, power on the right. Purely
+   decorative, so they hang off the bezel rather than eat screen area. */
+.demo-phone::before,
+.demo-phone::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #4a2c11, #241407);
+  pointer-events: none;
+}
+.demo-phone::before {
+  left: -3px;
+  top: 21%;
+  height: 12%;
+}
+.demo-phone::after {
+  right: -3px;
+  top: 26%;
+  height: 9%;
+}
+
+/* Warm halo so the dark bezel doesn't sit on cream as a hard cut-out. */
+.dp-glow {
+  position: absolute;
+  inset: -14% -22%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgba(217, 119, 6, 0.22),
+    rgba(217, 119, 6, 0.06) 58%,
+    transparent 78%
+  );
+  pointer-events: none;
+}
+
+/* ---------- earpiece strip ---------- */
+/* A strip of bezel rather than an overlay notch: the app inside owns its own
+   header, and floating a pill over it would clip real content. */
+.dp-ear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 18px;
+}
+.dp-ear i {
+  display: block;
+  width: 46px;
+  height: 5px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.dp-ear b {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #3b4a5a, #0b1118 70%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+/* ---------- screen ---------- */
+.dp-screen {
+  position: relative;
+  /* Explicit, because the child iframe's layout box stays full size — only
+     its paint is scaled — so the screen can't be allowed to size to it. */
+  width: var(--dp-w);
+  height: var(--dp-h);
+  overflow: hidden;
+  border-radius: 2.2rem;
+  /* Cream, not white: the split-second before the iframe paints should look
+     like the site, not like a blank tab. */
+  background: #fff8f1;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- status strip ---------- */
+/* The brown band the hero phone wears (menu-phone.css `.mp-status`), brought
+   over so both phones on the site read as the same object. It sits *outside*
+   the iframe by necessity: everything below it is the cafe's own theme, and
+   nothing here is allowed to repaint that. So this is the phone's status bar,
+   not the menu's header — which is also why it carries clock and signal
+   rather than anything about the food. */
+.dp-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--dp-status-h);
+  padding: 0 16px;
+  background: var(--dp-chrome);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  color: rgba(255, 248, 241, 0.6);
+}
+.dp-status .dp-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.dp-status .dp-bars i {
+  display: block;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(255, 248, 241, 0.45);
+}
+.dp-status .dp-bars i:nth-child(1) { height: 3px; }
+.dp-status .dp-bars i:nth-child(2) { height: 5px; }
+.dp-status .dp-bars i:nth-child(3) { height: 7px; }
+.dp-status .dp-bars i:nth-child(4) { height: 9px; background: #f0b45f; }
+
+/* Oversized then scaled down: dividing by the scale is what makes the app
+   believe it's on a ~430px phone while occupying `--dp-w` on screen. Height
+   is what's left of the screen under the status strip. No `max-width: 100%`
+   — that would clamp the pre-scale box and break the arithmetic; the
+   narrow-screen block below shrinks `--dp-w` instead. */
+.dp-screen iframe {
+  display: block;
+  width: calc(var(--dp-w) / var(--dp-scale));
+  height: calc((var(--dp-h) - var(--dp-status-h)) / var(--dp-scale));
+  border: 0;
+  background: #fff8f1;
+  transform: scale(var(--dp-scale));
+  transform-origin: 0 0;
+}
+
+/* ---------- home indicator ---------- */
+.dp-home {
+  display: flex;
+  justify-content: center;
+  height: 16px;
+  padding-top: 7px;
+}
+.dp-home i {
+  display: block;
+  width: 38%;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ---------- narrow screens ---------- */
+/* Below the two-column breakpoint the frame gives up its fixed device size
+   and takes the viewport instead, so a real phone never scrolls sideways to
+   see a picture of a phone. Height drops to something that still shows a few
+   dishes without pushing the CTAs off the page. */
+@media (max-width: 640px) {
+  .demo-phone {
+    --dp-w: min(360px, calc(100vw - 2.5rem - 20px));
+    --dp-h: clamp(460px, calc(100svh - 13rem), 634px);
+    --dp-bezel: 8px;
+    --dp-radius: 2.4rem;
+  }
+}
+
+/* Short desktop windows: keep the whole phone on screen rather than making
+   the page scroll past a sticky frame that's taller than the viewport. */
+@media (min-width: 641px) {
+  .demo-phone {
+    --dp-h: clamp(460px, calc(100svh - 11rem), 634px);
+  }
+}

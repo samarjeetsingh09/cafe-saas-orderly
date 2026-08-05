@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import path from "path";
+import sharp from "sharp";
 
 /**
  * Pluggable image storage (Security doc 5.9: server-side type + size
@@ -38,6 +39,33 @@ export async function saveMenuPhoto(cafeId: string, buf: Buffer): Promise<{ url:
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, name), buf);
   return { url: `/api/images/menu/${cafeId}/${name}` };
+}
+
+/** Store a wizard-uploaded logo/favicon before the tenant row exists (HQ-PORTAL-SPEC.md §6 Step 2). */
+export async function saveBrandingAsset(buf: Buffer): Promise<{ url: string } | { error: string }> {
+  if (buf.length > MAX_PHOTO_BYTES) return { error: "Image is too big — keep it under 2 MB." };
+  const type = sniffImageType(buf);
+  if (!type) return { error: "That file isn't a photo. Use JPG, PNG or WebP." };
+
+  const name = `${randomBytes(12).toString("hex")}.${type}`;
+  const dir = path.join(UPLOADS_ROOT, "branding");
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, name), buf);
+  return { url: `/api/images/branding/${name}` };
+}
+
+/**
+ * Derive a 32×32 PNG favicon from an already-validated logo buffer — run
+ * before the provisioning transaction opens (HQ-PORTAL-SPEC.md §6 Step 4:
+ * "never hold a transaction open across network/disk I/O").
+ */
+export async function generateFavicon(logoBuf: Buffer): Promise<{ url: string }> {
+  const png = await sharp(logoBuf).resize(32, 32, { fit: "cover" }).png().toBuffer();
+  const name = `${randomBytes(12).toString("hex")}.png`;
+  const dir = path.join(UPLOADS_ROOT, "branding");
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, name), png);
+  return { url: `/api/images/branding/${name}` };
 }
 
 /** Read a stored image for serving; null when missing or path escapes root. */

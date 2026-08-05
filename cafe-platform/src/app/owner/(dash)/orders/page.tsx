@@ -1,18 +1,12 @@
-import { getOwnerCafe } from "@/lib/session";
-import { getTodayOrders } from "@/lib/owner-orders";
-import { OrdersFeed } from "@/components/owner/OrdersFeed";
+import { redirect } from "next/navigation";
+import { getProfile } from "@/lib/session";
+import { getBoardData } from "@/lib/owner-board";
+import { OrdersBoard } from "@/components/owner/OrdersBoard";
 
-export const dynamic = "force-dynamic";
+export default async function Page() {
+  const profile = await getProfile();
+  if (!profile) redirect("/owner/login");
 
-export default async function OwnerOrdersPage() {
-  const cafe = (await getOwnerCafe())!;
-  const orders = await getTodayOrders(cafe.id);
-
-  return (
-    <div>
-      <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
-      <p className="mt-1 mb-6 text-sm text-slate-500">Today&apos;s orders, newest first.</p>
-      <OrdersFeed initialOrders={orders} />
-    </div>
-  );
+  const { stats, orders } = await getBoardData(profile.tenantId);
+  return <OrdersBoard initialStats={stats} initialOrders={orders} role={profile.role} />;
 }

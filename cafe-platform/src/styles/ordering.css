@@ -1,0 +1,346 @@
+/*
+ * Customer ordering app — ported verbatim from
+ * plan/bella-ordering-prototype_1.html (Phase F, plan/START-HERE.md). Hex
+ * values swapped for the shared tokens in styles/tokens.css (BUILD-SPEC.md
+ * §7.1 — the same frozen list console/kitchen/customer all draw from, so a
+ * per-tenant theme swap covers every surface at once). Scoped under
+ * `.ordering` so these generic class names never collide with the marketing
+ * site's Tailwind classes or the console's own `.console`-scoped CSS.
+ */
+.ordering * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+.ordering button { font-family: inherit; cursor: pointer; }
+.ordering input, .ordering textarea { font-family: inherit; }
+
+.ordering {
+  position: relative;
+  isolation: isolate;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  min-height: 100dvh;
+  padding-bottom: 120px;
+}
+/* Botanical wallpaper. Painted as a masked --ink wash rather than an SVG with
+   a baked-in stroke colour, so a cafe on a light palette gets a dark tracery
+   instead of the prototype's cream-on-cream (which vanished). `isolation` on
+   the parent is what lets z-index:-1 sit above its background but below content. */
+.ordering::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ink);
+  opacity: 0.055;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.1'%3E%3Cpath d='M20 200 C50 150 60 90 55 20'/%3E%3Cpath d='M55 60 C35 55 28 45 26 34'/%3E%3Cpath d='M56 84 C36 80 29 70 27 58'/%3E%3Cpath d='M58 108 C38 104 31 94 29 82'/%3E%3Cpath d='M57 60 C77 55 84 45 86 34'/%3E%3Cpath d='M56 84 C76 80 83 70 85 58'/%3E%3Cpath d='M54 108 C74 104 81 94 83 82'/%3E%3Cpath d='M200 30 C170 80 160 140 165 210'/%3E%3Cpath d='M165 170 C185 166 192 156 194 144'/%3E%3Cpath d='M164 146 C184 142 191 132 193 120'/%3E%3Cpath d='M163 122 C143 118 136 108 134 96'/%3E%3Cpath d='M164 146 C144 142 137 132 135 120'/%3E%3C/g%3E%3C/svg%3E")
+    0 0 / 220px 220px repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.1'%3E%3Cpath d='M20 200 C50 150 60 90 55 20'/%3E%3Cpath d='M55 60 C35 55 28 45 26 34'/%3E%3Cpath d='M56 84 C36 80 29 70 27 58'/%3E%3Cpath d='M58 108 C38 104 31 94 29 82'/%3E%3Cpath d='M57 60 C77 55 84 45 86 34'/%3E%3Cpath d='M56 84 C76 80 83 70 85 58'/%3E%3Cpath d='M54 108 C74 104 81 94 83 82'/%3E%3Cpath d='M200 30 C170 80 160 140 165 210'/%3E%3Cpath d='M165 170 C185 166 192 156 194 144'/%3E%3Cpath d='M164 146 C184 142 191 132 193 120'/%3E%3Cpath d='M163 122 C143 118 136 108 134 96'/%3E%3Cpath d='M164 146 C144 142 137 132 135 120'/%3E%3C/g%3E%3C/svg%3E")
+    0 0 / 220px 220px repeat;
+}
+.ordering .wrap { max-width: 760px; margin: 0 auto; padding: 0 18px; }
+
+/* ---------- header ---------- */
+/* Re-points the palette tokens *inside* the header rather than overriding
+   each child, so a tenant that paints `--header-bg` as a solid block gets the
+   brand, tagline, kitchen switch and table chip following it automatically —
+   including `stroke="var(--accent)"` on the brand mark in OrderingApp.tsx.
+   Defaults in tokens.css alias straight back to the page palette, so a cafe
+   that sets no header colour is unchanged. */
+.ordering header {
+  position: relative; text-align: center; padding: 26px 18px 18px;
+  --ink: var(--header-ink);
+  --ink-dim: var(--header-ink-dim);
+  --ink-faint: var(--header-ink-faint);
+  --accent: var(--header-accent);
+  --line: var(--header-line);
+  --sunken: var(--header-sunken);
+  --sunken-soft: var(--header-sunken-soft);
+  border-bottom: 1px solid var(--line);
+  background: var(--header-bg);
+  color: var(--ink);
+}
+.ordering .brand-mark { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.ordering .brand-mark svg { width: 34px; height: 34px; opacity: .9; }
+.ordering .brand { font-family: var(--font-display); font-size: 52px; line-height: .9; color: var(--ink); letter-spacing: 1px; }
+.ordering .brand-sub { font-size: 9px; letter-spacing: 3.4px; text-transform: uppercase; color: var(--ink-dim); margin-top: 8px; font-weight: 300; }
+.ordering .table-chip {
+  display: inline-flex; align-items: center; gap: 7px; margin-top: 16px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+  font-size: 11.5px; letter-spacing: .6px; color: var(--ink-dim); background: var(--sunken-soft);
+}
+.ordering .table-chip b { color: var(--accent); font-weight: 600; }
+
+/* ---------- section title ---------- */
+.ordering .script-head { display: flex; align-items: center; gap: 16px; margin: 30px 0 6px; }
+.ordering .script-head .rule { flex: 1; height: 1px; background: var(--line); }
+.ordering .script-head h2 { font-family: var(--font-display); font-weight: 400; font-size: 38px; margin: 0; color: var(--ink); white-space: nowrap; }
+
+/* ---------- categories ----------
+   The strip is a scroller (phones) that also has to look composed on a wide
+   screen, where the whole page is centred. `safe center` is the pairing that
+   does both: centred while the tiles fit, falling back to start-alignment the
+   moment they overflow — plain `center` would push the first tile off the
+   left edge with no way to scroll back to it. */
+.ordering .cats { padding: 16px 0 6px; }
+.ordering .cats-head {
+  margin: 0 0 13px; text-align: center; font-family: var(--font-body); font-weight: 400;
+  font-size: 10px; letter-spacing: 2.8px; text-transform: uppercase; color: var(--ink-faint);
+}
+.ordering .cats-track {
+  display: flex; gap: 12px;
+  justify-content: center;
+  justify-content: safe center;
+  overflow-x: auto; padding: 4px 18px 6px;
+  scrollbar-width: none; scroll-snap-type: x mandatory; scroll-padding-inline: 18px;
+}
+.ordering .cats-track::-webkit-scrollbar { display: none; }
+.ordering .cat { flex: 0 0 118px; scroll-snap-align: start; background: none; border: 0; padding: 0; font-family: inherit; color: inherit; text-align: center; }
+.ordering .cat-art {
+  height: 104px; border-radius: 14px;
+  background: radial-gradient(120% 100% at 50% 0%, var(--surface-2), var(--bg));
+  border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .25s ease, transform .25s ease;
+}
+.ordering .cat-art svg { width: 56px; height: 56px; }
+.ordering .cat span { display: block; margin-top: 9px; font-size: 11.5px; letter-spacing: .9px; color: var(--ink-dim); text-transform: uppercase; }
+.ordering .cat[aria-selected="true"] .cat-art { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 10px 24px var(--shadow); }
+.ordering .cat[aria-selected="true"] span { color: var(--accent); }
+.ordering .cat:focus-visible .cat-art { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ---------- kitchen switch ---------- */
+.ordering .switch { position: relative; display: inline-flex; margin: 18px auto 0; border: 1px solid var(--line); border-radius: 999px; padding: 4px; background: var(--sunken); }
+.ordering .switch .glide {
+  position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 13%, transparent); border: 1px solid var(--accent);
+  transition: transform .32s cubic-bezier(.2, .8, .2, 1);
+}
+.ordering .switch[data-side="nonveg"] .glide { transform: translateX(100%); }
+.ordering .switch button {
+  position: relative; z-index: 1; flex: 1; min-width: 132px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: none; border: 0; border-radius: 999px; padding: 10px 16px;
+  font-family: inherit; font-size: 11px; font-weight: 500; letter-spacing: 1.6px; text-transform: uppercase;
+  color: var(--ink-dim); transition: color .25s ease;
+}
+.ordering .switch button[aria-pressed="true"] { color: var(--accent); }
+.ordering .switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.ordering .kitchen-note { margin: 10px 0 0; font-size: 10.5px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-faint); font-weight: 300; text-align: center; }
+.ordering .empty { text-align: center; padding: 46px 20px; color: var(--ink-dim); font-size: 12.5px; font-weight: 300; line-height: 1.7; }
+.ordering .empty b { display: block; font-family: var(--font-display); font-size: 26px; color: var(--ink); font-weight: 400; margin-bottom: 8px; }
+
+/* ---------- dishes ---------- */
+.ordering .dish { display: flex; gap: 14px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.ordering .dish-art {
+  flex: 0 0 74px; height: 74px; border-radius: 12px;
+  background: linear-gradient(160deg, var(--surface-2), var(--bg));
+  border: 1px solid var(--line); display: flex; align-items: center; justify-content: center;
+}
+.ordering .dish-art svg { width: 42px; height: 42px; }
+.ordering .dish-body { flex: 1; min-width: 0; }
+.ordering .dish-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ordering .dish-title h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: .2px; }
+.ordering .marks { display: inline-flex; gap: 5px; align-items: center; transform: translateY(1px); }
+.ordering .dot { width: 11px; height: 11px; border-radius: 2.5px; border: 1.4px solid var(--veg); display: inline-block; position: relative; }
+.ordering .dot::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: var(--veg); }
+.ordering .dot.nv { border-color: var(--nonveg); }
+.ordering .dot.nv::after { background: var(--nonveg); }
+.ordering .tag { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent-2); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 4px; padding: 2px 6px; }
+.ordering .dish p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-dim); font-weight: 300; }
+.ordering .price { margin-top: 10px; font-size: 14px; font-weight: 600; color: var(--accent); }
+.ordering .sizes { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.ordering .size { background: none; border: 1px solid var(--line); color: var(--ink-dim); border-radius: 999px; padding: 5px 12px; font-size: 11.5px; font-family: inherit; }
+.ordering .size[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.ordering .size:disabled { opacity: .4; cursor: not-allowed; }
+
+.ordering .add {
+  margin-top: 12px; display: inline-flex; align-items: center; gap: 7px;
+  background: none; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 999px;
+  color: var(--accent); font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; padding: 8px 18px; transition: background .2s ease, border-color .2s ease;
+}
+.ordering .add:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); border-color: var(--accent); }
+.ordering .add:active { transform: scale(.97); }
+.ordering .add:disabled { opacity: .4; cursor: not-allowed; }
+.ordering .soldout { margin-top: 12px; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink-faint); }
+.ordering .stepper { display: inline-flex; align-items: center; gap: 14px; margin-top: 12px; border: 1px solid var(--accent); border-radius: 999px; padding: 5px 12px; }
+.ordering .stepper button { background: none; border: 0; color: var(--accent); font-size: 17px; line-height: 1; font-family: inherit; padding: 2px 4px; }
+.ordering .stepper span { font-size: 13px; font-weight: 600; color: var(--accent); min-width: 14px; text-align: center; }
+
+.ordering .note-line { display: flex; align-items: center; gap: 8px; justify-content: center; margin: 26px 0 8px; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-dim); }
+
+/* ---------- cart bar ---------- */
+.ordering .cartbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 97%, transparent) 45%);
+  backdrop-filter: blur(8px);
+  transform: translateY(140%); transition: transform .35s cubic-bezier(.2, .8, .2, 1);
+}
+.ordering .cartbar.show { transform: translateY(0); }
+.ordering .cartbar-inner {
+  max-width: 724px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between;
+  background: var(--accent); color: var(--bg); border-radius: 14px; padding: 13px 18px;
+  box-shadow: 0 18px 40px var(--shadow);
+}
+.ordering .cartbar-inner small { display: block; font-size: 10.5px; letter-spacing: 1.2px; text-transform: uppercase; opacity: .7; }
+.ordering .cartbar-inner strong { font-size: 15px; font-weight: 600; }
+.ordering .cartbar-inner .go { font-size: 12px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; }
+
+/* ---------- track bar ----------
+   "Check progress" — the way back to an order after the tracker sheet has
+   been closed (or the whole page reloaded; see lib/saved-order.ts). It is a
+   compact right-aligned pill, not a full-width bar, on purpose: the cart bar
+   below it is the primary action while a cart is open, and two competing
+   full-width CTAs at the bottom of a phone is how customers tap the wrong
+   one. Sits one layer under the cart bar for the same reason. */
+.ordering .trackbar {
+  position: fixed; right: 0; bottom: 0; z-index: 39;
+  padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  transform: translateY(140%); transition: transform .35s cubic-bezier(.2, .8, .2, 1), bottom .35s cubic-bezier(.2, .8, .2, 1);
+  pointer-events: none;
+}
+.ordering .trackbar.show { transform: translateY(0); pointer-events: auto; }
+/* Cart bar's own height, so the pill rides above it instead of underneath. */
+.ordering .trackbar.lifted { bottom: calc(74px + env(safe-area-inset-bottom)); }
+.ordering .trackbar-btn {
+  display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; padding: 10px 16px;
+  background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: 1.3px; text-transform: uppercase;
+  box-shadow: 0 14px 30px var(--shadow);
+  transition: transform .15s ease, border-color .15s ease;
+}
+.ordering .trackbar-btn:hover { transform: translateY(-1px); border-color: var(--accent); }
+.ordering .trackbar-btn:disabled { opacity: .6; cursor: wait; }
+.ordering .trackbar-btn em { font-style: normal; color: var(--ink-dim); font-weight: 400; letter-spacing: .6px; }
+.ordering .trackbar-btn .pulse {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+  animation: ordering-pulse 2s ease-out infinite;
+}
+@keyframes ordering-pulse {
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ordering .trackbar { transition: none; }
+  .ordering .trackbar-btn .pulse { animation: none; }
+}
+
+/* ---------- tracker order tabs ----------
+   Only rendered when a table is following more than one order at once
+   ("Order something else" mid-meal). A scroller rather than a wrapping row:
+   the sheet is a phone-width surface and a fourth round must push sideways,
+   not shove the tracker itself down the screen. */
+.ordering .track-tabs {
+  display: flex; gap: 8px; overflow-x: auto; margin: 0 0 18px;
+  padding-bottom: 4px; scrollbar-width: none;
+}
+.ordering .track-tabs::-webkit-scrollbar { display: none; }
+.ordering .track-tab {
+  flex: none; text-align: left; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px;
+  background: var(--sunken-soft); color: var(--ink-dim);
+  transition: border-color .2s ease, color .2s ease, background .2s ease;
+}
+.ordering .track-tab b { display: block; font-size: 12.5px; font-weight: 600; letter-spacing: .4px; }
+.ordering .track-tab small { display: block; margin-top: 2px; font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase; opacity: .8; }
+.ordering .track-tab[aria-selected="true"] {
+  border-color: var(--accent); color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.ordering .track-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- sheet ---------- */
+.ordering .scrim { position: fixed; inset: 0; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 50; }
+.ordering .scrim.show { opacity: 1; pointer-events: auto; }
+.ordering .sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; max-height: 88vh; overflow-y: auto;
+  background: var(--bg); border-top: 1px solid var(--line);
+  border-radius: 22px 22px 0 0; padding: 8px 18px calc(28px + env(safe-area-inset-bottom));
+  transform: translateY(100%); transition: transform .38s cubic-bezier(.2, .8, .2, 1);
+  box-shadow: 0 18px 40px var(--shadow);
+}
+.ordering .sheet.show { transform: translateY(0); }
+.ordering .sheet-inner { max-width: 600px; margin: 0 auto; }
+.ordering .grab { width: 42px; height: 4px; border-radius: 999px; background: var(--line); margin: 8px auto 4px; }
+.ordering .sheet h3 { font-family: var(--font-display); font-weight: 400; font-size: 34px; margin: 6px 0 18px; text-align: center; }
+
+.ordering .line { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.ordering .line .nm { font-size: 13.5px; font-weight: 500; }
+.ordering .line .sz { font-size: 11px; color: var(--ink-dim); margin-top: 3px; }
+.ordering .line .amt { font-size: 13.5px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.ordering .mini { display: inline-flex; align-items: center; gap: 12px; margin-top: 8px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.ordering .mini button { background: none; border: 0; color: var(--accent); font-size: 15px; font-family: inherit; }
+.ordering .mini span { font-size: 12px; min-width: 12px; text-align: center; }
+
+.ordering .totals { padding: 14px 0 4px; font-size: 13px; }
+.ordering .totals div { display: flex; justify-content: space-between; padding: 5px 0; color: var(--ink-dim); }
+.ordering .totals .grand { color: var(--ink); font-size: 16px; font-weight: 600; padding-top: 12px; margin-top: 6px; border-top: 1px solid var(--line); }
+.ordering .totals .grand span:last-child { color: var(--accent); }
+
+.ordering label.fld { display: block; margin: 14px 0 0; }
+.ordering label.fld em { display: block; font-style: normal; font-size: 10.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 7px; }
+.ordering input, .ordering textarea {
+  width: 100%; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--ink); font-size: 14px; padding: 12px 14px;
+}
+.ordering input:focus, .ordering textarea:focus { outline: none; border-color: var(--accent); }
+.ordering textarea { resize: none; height: 64px; font-weight: 300; }
+
+.ordering .pay { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.ordering .pay button { background: var(--sunken); border: 1px solid var(--line); border-radius: 12px; padding: 15px 12px; color: var(--ink-dim); font-family: inherit; text-align: left; }
+.ordering .pay button b { display: block; font-size: 13.5px; color: var(--ink); font-weight: 600; margin-bottom: 3px; }
+.ordering .pay button small { font-size: 10.5px; font-weight: 300; }
+.ordering .pay button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.ordering .pay button[aria-pressed="true"] b { color: var(--accent); }
+
+.ordering .cta {
+  width: 100%; margin-top: 20px; background: var(--accent); border: 0; border-radius: 12px;
+  color: var(--bg); font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: 1.6px;
+  text-transform: uppercase; padding: 16px;
+}
+.ordering .cta:disabled { opacity: .4; cursor: not-allowed; }
+.ordering .ghost {
+  width: 100%; margin-top: 10px; background: none; border: 1px solid var(--line); border-radius: 12px;
+  color: var(--ink-dim); font-family: inherit; font-size: 12px; letter-spacing: 1.2px;
+  text-transform: uppercase; padding: 14px;
+}
+.ordering .error-note { margin: 10px 0 0; font-size: 12px; color: var(--danger); text-align: center; }
+
+/* ---------- upi ---------- */
+.ordering .qr { width: 170px; height: 170px; margin: 4px auto 14px; border-radius: 14px; background: var(--ink); display: flex; align-items: center; justify-content: center; }
+.ordering .qr svg { width: 138px; height: 138px; fill: var(--bg); }
+.ordering .upi-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+.ordering .upi-row i { font-style: normal; font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; color: var(--ink-dim); }
+.ordering .center { text-align: center; }
+.ordering .muted { font-size: 11.5px; color: var(--ink-dim); font-weight: 300; line-height: 1.6; }
+
+/* ---------- success / tracker ---------- */
+.ordering .tick-mark { width: 64px; height: 64px; margin: 2px auto 12px; border-radius: 50%; border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; }
+.ordering .tick-mark svg { width: 28px; height: 28px; }
+.ordering .tick-mark svg path { stroke-dasharray: 40; stroke-dashoffset: 40; animation: ordering-draw .6s .15s ease forwards; }
+@keyframes ordering-draw { to { stroke-dashoffset: 0; } }
+.ordering .oid { font-size: 12px; letter-spacing: 2.4px; color: var(--accent); text-transform: uppercase; }
+.ordering .track { margin: 22px 0 6px; display: flex; flex-direction: column; gap: 0; }
+.ordering .step { display: flex; gap: 14px; align-items: flex-start; }
+.ordering .step .rail { display: flex; flex-direction: column; align-items: center; align-self: stretch; }
+.ordering .step .bead { width: 11px; height: 11px; border-radius: 50%; border: 1px solid var(--line); margin-top: 4px; flex: 0 0 auto; }
+.ordering .step .stem { width: 1px; flex: 1; background: var(--line); min-height: 26px; }
+.ordering .step:last-child .stem { display: none; }
+.ordering .step .txt { padding-bottom: 20px; }
+.ordering .step .txt b { display: block; font-size: 13.5px; font-weight: 500; color: var(--ink-dim); }
+.ordering .step .txt small { font-size: 11px; color: var(--ink-faint); font-weight: 300; }
+.ordering .step.on .bead { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
+.ordering .step.on .txt b { color: var(--ink); }
+.ordering .step.on .stem { background: linear-gradient(var(--accent), var(--line)); }
+
+@media (max-width: 420px) {
+  .ordering .brand { font-size: 44px; }
+  .ordering .cat { flex: 0 0 104px; }
+  .ordering .cat-art { height: 92px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ordering * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

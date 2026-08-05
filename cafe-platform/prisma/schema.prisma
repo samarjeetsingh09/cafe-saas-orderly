@@ -1,5 +1,9 @@
-// Cafe QR Ordering Platform — full MVP schema
-// Source of truth: Technical_Architecture_Document.md Section 4 + DESIGN_SYSTEM.md build-plan impacts
+// OrderLy platform schema — Tenant-based rebuild (plan/BUILD-SPEC.md §4 + HQ-PORTAL-SPEC.md §2)
+// Postgres, not SQLite: uuid/jsonb/numeric used natively. See ../NOTES.md for decisions
+// made while adapting the plan docs onto this existing app (realtime, RLS, naming, etc).
+//
+// Marketing's `Lead` model + `LeadStatus` enum at the bottom of this file are UNTOUCHED —
+// they belong to the marketing site, which is explicitly out of scope for this rebuild.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,202 +15,604 @@ datasource db {
   // and via the pg driver adapter in src/lib/db.ts (runtime).
 }
 
-enum SubscriptionStatus {
+// ───────────────────────── enums ─────────────────────────
+
+enum TenantStatus {
+  trial
   active
-  expiring_soon
-  expired
-  disabled
+  paused
+  cancelled
 }
 
-enum PrinterConnectionType {
-  lan
-  usb_helper
-  bluetooth
-  not_configured
+enum ProfileRole {
+  owner
+  manager
+  waiter
+  kitchen
 }
 
-enum PaymentMode {
-  online
+enum Station {
+  veg
+  nonveg
+}
+
+enum OrderStation {
+  veg
+  nonveg
+  mixed
+}
+
+enum OrderChannel {
+  qr
+  staff
+}
+
+enum OrderStage {
+  new
+  preparing
+  ready
+  served
+  cancelled
+}
+
+enum PayMethod {
   cash
+  online
 }
 
-enum PaymentStatus {
-  payment_pending // online order created, webhook not yet confirmed — never printed/fulfilled
-  paid
-  cash_pending
-  collected
-}
-
-enum PrintStatus {
+enum PayStatus {
   pending
-  sent
+  paid
   failed
+  refunded
 }
 
-enum PlatformPaymentType {
-  setup_advance
-  setup_final
-  subscription_renewal
+enum ActorKind {
+  customer
+  staff
+  system
 }
 
-enum QueryStatus {
+enum TicketPriority {
+  normal
+  high
+}
+
+enum TicketState {
   open
+  with_us
   resolved
 }
 
-enum AdminRole {
-  founder
-  support_staff
+enum TicketAuthorKind {
+  cafe
+  support
 }
 
-model Cafe {
-  id                    String                @id @default(uuid()) @db.Uuid
-  name                  String
-  slug                  String                @unique // customer-facing URL: /{slug}/t/{token}; reserved names blocked in app layer
-  ownerName             String                @map("owner_name")
-  phone                 String                @unique // owner login identifier
-  passwordHash          String                @map("password_hash") // bcrypt
-  address               String?
-  setupFeeAmount        Decimal               @default(0) @map("setup_fee_amount") @db.Decimal(10, 2)
-  setupFeeAdvancePaid   Boolean               @default(false) @map("setup_fee_advance_paid") // 30% advance
-  setupFeeFullPaid      Boolean               @default(false) @map("setup_fee_full_paid") // remaining 70%
-  subscriptionStatus    SubscriptionStatus    @default(active) @map("subscription_status")
-  subscriptionStartDate DateTime?             @map("subscription_start_date") @db.Date
-  subscriptionEndDate   DateTime?             @map("subscription_end_date") @db.Date // drives 5-day reminder + auto-disable cron
-  subscriptionAmount    Decimal               @default(0) @map("subscription_amount") @db.Decimal(10, 2)
-  menuEnabled           Boolean               @default(false) @map("menu_enabled") // FR-24 master switch, checked before rendering customer menu
-  printerConnectionType PrinterConnectionType @default(not_configured) @map("printer_connection_type")
-  printerConfig         Json?                 @map("printer_config") // e.g. { "ip": "192.168.1.50" } for LAN
-  createdAt             DateTime              @default(now()) @map("created_at")
-  updatedAt             DateTime              @updatedAt @map("updated_at")
-
-  tables               Table[]
-  categories           Category[]
-  menuItems            MenuItem[]
-  orders               Order[]
-  subscriptionPayments SubscriptionPayment[]
-  supportQueries       SupportQuery[]
-
-  @@map("cafes")
+enum SubStatus {
+  trialing
+  active
+  past_due
+  cancelled
 }
 
-model Table {
-  id          String   @id @default(uuid()) @db.Uuid
-  cafeId      String   @map("cafe_id") @db.Uuid
-  tableNumber String   @map("table_number") // "5", "Patio-2"
-  qrToken     String   @unique @map("qr_token") // long random token in the QR URL — frozen once stickers are printed
-  qrCodeUrl   String?  @map("qr_code_url") // generated QR image in Supabase Storage
-  createdAt   DateTime @default(now()) @map("created_at")
+enum InvoiceStatus {
+  paid
+  due
+  failed
+}
 
-  cafe   Cafe    @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+enum PlatformRole {
+  super_admin
+  ops
+  support
+}
+
+enum LeadSource {
+  website
+  referral
+  walk_in
+  instagram
+}
+
+enum SalesLeadStage {
+  lead
+  demo
+  negotiation
+  won
+  lost
+}
+
+// ───────────────────────── tenant-scoped models ─────────────────────────
+
+model Tenant {
+  id            String       @id @default(uuid()) @db.Uuid
+  slug          String       @unique
+  name          String
+  tagline       String?
+  logoUrl       String?      @map("logo_url")
+  faviconUrl    String?      @map("favicon_url")
+  theme         Json         @default("{}")
+  currency      String       @default("INR")
+  gstPercent    Decimal      @default(5) @map("gst_percent") @db.Decimal(4, 2)
+  gstNumber     String?      @map("gst_number")
+  address       String?
+  phone         String?
+  timezone      String       @default("Asia/Kolkata")
+  splitKitchen  Boolean      @default(true) @map("split_kitchen")
+  status        TenantStatus @default(trial)
+  trialEndsAt   DateTime?    @map("trial_ends_at")
+  goLiveAt      DateTime?    @map("go_live_at")
+  version       String?
+  setupFeePaise Int?         @map("setup_fee_paise")
+  templateId    String?      @map("template_id") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at")
+  deletedAt     DateTime?    @map("deleted_at")
+
+  template              CafeTemplate?          @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  profiles              Profile[]
+  cafeTables            CafeTable[]
+  categories            Category[]
+  menuItems             MenuItem[]
+  itemVariants          ItemVariant[]
+  orders                Order[]
+  orderItems            OrderItem[]
+  orderEvents           OrderEvent[]
+  tickets               Ticket[]
+  ticketMessages        TicketMessage[]
+  subscription          Subscription?
+  invoices              Invoice[]
+  orderCounter          OrderCounter?
+  paymentConfig         PaymentConfig?
+  activityLogs          ActivityLog[]
+  impersonationSessions ImpersonationSession[]
+  tenantHealth          TenantHealth?
+  salesLeads            SalesLead[]
+  themeVersions         ThemeVersion[]
+
+  @@map("tenants")
+}
+
+model Profile {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  fullName     String      @map("full_name")
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  role         ProfileRole
+  station      Station?
+  active       Boolean     @default(true)
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  placedOrders         Order[]                @relation("OrderPlacedBy")
+  orderEvents          OrderEvent[]
+  openedTickets        Ticket[]
+  impersonationTargets ImpersonationSession[]
+
+  @@index([tenantId])
+  @@map("profiles")
+}
+
+model CafeTable {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  label     String
+  seats     Int?
+  qrToken   String   @unique @map("qr_token")
+  active    Boolean  @default(true)
+  scans     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders Order[]
 
-  @@unique([cafeId, tableNumber])
-  @@map("tables")
+  @@unique([tenantId, label])
+  @@index([tenantId])
+  @@map("cafe_tables")
 }
 
 model Category {
-  id           String   @id @default(uuid()) @db.Uuid
-  cafeId       String   @map("cafe_id") @db.Uuid
-  name         String
-  displayOrder Int      @default(0) @map("display_order")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  name      String
+  isVeg     Boolean @map("is_veg")
+  sortOrder Int     @default(0) @map("sort_order")
+  active    Boolean @default(true)
 
-  cafe      Cafe       @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   menuItems MenuItem[]
 
+  @@unique([tenantId, name])
+  @@index([tenantId])
   @@map("categories")
 }
 
 model MenuItem {
-  id           String   @id @default(uuid()) @db.Uuid
-  cafeId       String   @map("cafe_id") @db.Uuid
-  categoryId   String   @map("category_id") @db.Uuid
-  name         String
-  description  String?
-  price        Decimal  @db.Decimal(10, 2)
-  photoUrl     String?  @map("photo_url") // Supabase Storage
-  isVeg        Boolean  @default(true) @map("is_veg") // green/red marker on customer menu
-  isAvailable  Boolean  @default(true) @map("is_available") // sold-out toggle
-  displayOrder Int      @default(0) @map("display_order")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  name        String
+  description String?
+  imageUrl    String?  @map("image_url")
+  isVeg       Boolean  @map("is_veg")
+  available   Boolean  @default(true)
+  prepMinutes Int      @default(12) @map("prep_minutes")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  cafe       Cafe        @relation(fields: [cafeId], references: [id], onDelete: Cascade)
-  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category   Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  variants   ItemVariant[]
   orderItems OrderItem[]
 
+  @@index([tenantId, categoryId])
   @@map("menu_items")
 }
 
+model ItemVariant {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  itemId     String @map("item_id") @db.Uuid
+  label      String
+  pricePaise Int    @map("price_paise")
+  sortOrder  Int    @default(0) @map("sort_order")
+
+  tenant Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  item   MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, label])
+  @@index([tenantId])
+  @@map("item_variants")
+}
+
 model Order {
-  id                   String        @id @default(uuid()) @db.Uuid
-  cafeId               String        @map("cafe_id") @db.Uuid
-  tableId              String        @map("table_id") @db.Uuid
-  orderNumber          Int           @map("order_number") // sequential per cafe, staff-facing only — NEVER in customer URLs
-  customerSessionToken String        @map("customer_session_token") // scopes what a customer's browser may see (Security doc 3.2 Risk 1)
-  confirmationToken    String        @unique @map("confirmation_token") // unguessable customer status-page URL (Security doc 3.2 Risk 2)
-  customerName         String        @map("customer_name")
-  customerPhone        String        @map("customer_phone")
-  paymentMode          PaymentMode   @map("payment_mode")
-  paymentStatus        PaymentStatus @map("payment_status")
-  totalAmount          Decimal       @map("total_amount") @db.Decimal(10, 2)
-  razorpayOrderId      String?       @map("razorpay_order_id")
-  razorpayPaymentId    String?       @map("razorpay_payment_id")
-  printStatus          PrintStatus   @default(pending) @map("print_status") // drives FR-9 printer-failure alert
-  createdAt            DateTime      @default(now()) @map("created_at")
+  id                String       @id @default(uuid()) @db.Uuid
+  tenantId          String       @map("tenant_id") @db.Uuid
+  code              String
+  tableId           String?      @map("table_id") @db.Uuid
+  tableLabel        String       @map("table_label")
+  station           OrderStation
+  channel           OrderChannel
+  placedBy          String?      @map("placed_by") @db.Uuid
+  customerName      String?      @map("customer_name")
+  customerPhone     String?      @map("customer_phone")
+  note              String?
+  stage             OrderStage   @default(new)
+  payMethod         PayMethod    @map("pay_method")
+  payStatus         PayStatus    @default(pending) @map("pay_status")
+  subtotalPaise     Int          @map("subtotal_paise")
+  taxPaise          Int          @map("tax_paise")
+  totalPaise        Int          @map("total_paise")
+  razorpayOrderId   String?      @map("razorpay_order_id")
+  razorpayPaymentId String?      @map("razorpay_payment_id")
+  idempotencyKey    String?      @map("idempotency_key")
+  placedAt          DateTime     @default(now()) @map("placed_at")
+  acceptedAt        DateTime?    @map("accepted_at")
+  readyAt           DateTime?    @map("ready_at")
+  servedAt          DateTime?    @map("served_at")
 
-  cafe       Cafe        @relation(fields: [cafeId], references: [id], onDelete: Restrict)
-  table      Table       @relation(fields: [tableId], references: [id], onDelete: Restrict)
-  orderItems OrderItem[]
+  tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  table           CafeTable?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  placedByProfile Profile?     @relation("OrderPlacedBy", fields: [placedBy], references: [id], onDelete: SetNull)
+  items           OrderItem[]
+  events          OrderEvent[]
 
-  @@unique([cafeId, orderNumber])
-  @@index([cafeId, createdAt])
-  @@index([customerSessionToken])
+  @@unique([tenantId, code])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, stage])
+  @@index([tenantId, placedAt(sort: Desc)])
   @@map("orders")
 }
 
 model OrderItem {
-  id                String  @id @default(uuid()) @db.Uuid
-  orderId           String  @map("order_id") @db.Uuid
-  menuItemId        String? @map("menu_item_id") @db.Uuid // nullable: historical orders survive menu-item deletion
-  itemNameSnapshot  String  @map("item_name_snapshot") // captured at order time
-  itemPriceSnapshot Decimal @map("item_price_snapshot") @db.Decimal(10, 2)
-  quantity          Int
-  subtotal          Decimal @db.Decimal(10, 2)
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  orderId      String  @map("order_id") @db.Uuid
+  itemId       String? @map("item_id") @db.Uuid
+  name         String
+  variantLabel String  @map("variant_label")
+  unitPaise    Int     @map("unit_paise")
+  qty          Int
+  isVeg        Boolean @map("is_veg")
+  plated       Boolean @default(false)
+  note         String?
 
-  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItem MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  tenant Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item   MenuItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
 
+  @@index([tenantId, orderId])
   @@map("order_items")
 }
 
-model SubscriptionPayment {
-  id          String              @id @default(uuid()) @db.Uuid
-  cafeId      String              @map("cafe_id") @db.Uuid
-  amount      Decimal             @db.Decimal(10, 2)
-  paymentType PlatformPaymentType @map("payment_type")
-  paymentDate DateTime            @default(now()) @map("payment_date")
-  periodStart DateTime?           @map("period_start") @db.Date
-  periodEnd   DateTime?           @map("period_end") @db.Date
+/// Append-only audit trail — never update, only insert.
+model OrderEvent {
+  id        BigInt      @id @default(autoincrement())
+  tenantId  String      @map("tenant_id") @db.Uuid
+  orderId   String      @map("order_id") @db.Uuid
+  fromStage OrderStage? @map("from_stage")
+  toStage   OrderStage  @map("to_stage")
+  actorId   String?     @map("actor_id") @db.Uuid
+  actorKind ActorKind   @map("actor_kind")
+  at        DateTime    @default(now())
 
-  cafe Cafe @relation(fields: [cafeId], references: [id], onDelete: Restrict)
+  tenant Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor  Profile? @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
-  @@map("subscription_payments")
+  @@index([tenantId, orderId])
+  @@map("order_events")
 }
 
-model SupportQuery {
-  id         String      @id @default(uuid()) @db.Uuid
-  cafeId     String      @map("cafe_id") @db.Uuid
-  message    String
-  status     QueryStatus @default(open)
-  createdAt  DateTime    @default(now()) @map("created_at")
-  resolvedAt DateTime?   @map("resolved_at")
+model Ticket {
+  id        String         @id @default(uuid()) @db.Uuid
+  tenantId  String         @map("tenant_id") @db.Uuid
+  code      String
+  topic     String
+  subject   String
+  priority  TicketPriority @default(normal)
+  state     TicketState    @default(open)
+  openedBy  String?        @map("opened_by") @db.Uuid
+  createdAt DateTime       @default(now()) @map("created_at")
+  /// HQ-side triage (HQ-PORTAL-SPEC.md §10) — never shown on the cafe side.
+  assigneeId   String?   @map("assignee_id") @db.Uuid
+  firstReplyAt DateTime? @map("first_reply_at")
+  resolvedAt   DateTime? @map("resolved_at")
 
-  cafe Cafe @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  opener   Profile?        @relation(fields: [openedBy], references: [id], onDelete: SetNull)
+  assignee PlatformUser?   @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  messages TicketMessage[]
 
-  @@map("support_queries")
+  @@index([assigneeId])
+  @@map("tickets")
 }
+
+model TicketMessage {
+  id         BigInt           @id @default(autoincrement())
+  tenantId   String           @map("tenant_id") @db.Uuid
+  ticketId   String           @map("ticket_id") @db.Uuid
+  authorKind TicketAuthorKind @map("author_kind")
+  authorId   String?          @map("author_id") @db.Uuid
+  body       String
+  /// HQ-only note on the thread — never returned to the cafe side (owner-support.ts filters it out).
+  internal   Boolean          @default(false)
+  at         DateTime         @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_messages")
+}
+
+// ───────────────────────── billing ─────────────────────────
+
+model Plan {
+  id         String @id
+  name       String
+  pricePaise Int    @map("price_paise")
+  maxTables  Int    @map("max_tables")
+  features   Json   @default("[]")
+  sortOrder  Int    @map("sort_order")
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  tenantId     String    @id @map("tenant_id") @db.Uuid
+  planId       String    @map("plan_id")
+  status       SubStatus @default(active)
+  currentStart DateTime  @map("current_start")
+  currentEnd   DateTime  @map("current_end")
+  cancelAtEnd  Boolean   @default(false) @map("cancel_at_end")
+  /// Negotiated price for this tenant. Null = charge the plan's list price.
+  /// Kept on the subscription, not the plan, so a discount for one cafe can
+  /// never leak into every other cafe on the same plan.
+  priceOverridePaise Int? @map("price_override_paise")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id          String        @id @default(uuid()) @db.Uuid
+  tenantId    String        @map("tenant_id") @db.Uuid
+  number      String
+  amountPaise Int           @map("amount_paise")
+  status      InvoiceStatus
+  issuedOn    DateTime      @map("issued_on") @db.Date
+  pdfUrl      String?       @map("pdf_url")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+/// Gapless-ish per-tenant order code counter — incremented via `next_order_code()`
+/// Postgres function (added as raw SQL in the migration), same upsert-and-return pattern
+/// as the advisory-lock order numbering it replaces.
+model OrderCounter {
+  tenantId String @id @map("tenant_id") @db.Uuid
+  nextNo   Int    @default(1001) @map("next_no")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("order_counters")
+}
+
+// ───────────────────────── HQ / platform models ─────────────────────────
+
+model PlatformUser {
+  id           String       @id @default(uuid()) @db.Uuid
+  email        String       @unique
+  passwordHash String       @map("password_hash")
+  fullName     String       @map("full_name")
+  role         PlatformRole
+  totpSecret   String?      @map("totp_secret")
+  active       Boolean      @default(true)
+  lastLoginAt  DateTime?    @map("last_login_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  activityLogs          ActivityLog[]
+  impersonationSessions ImpersonationSession[]
+  assignedTickets       Ticket[]
+  themeVersions         ThemeVersion[]
+  ownedLeads            SalesLead[]
+
+  @@map("platform_users")
+}
+
+/// Theme snapshot history (HQ-PORTAL-SPEC.md §12) — the last 10 per tenant, one-click revert.
+/// Written before each theme write, so the newest row is the *previous* theme, not the current one.
+model ThemeVersion {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  theme     Json
+  savedById String?  @map("saved_by_id") @db.Uuid
+  savedAt   DateTime @default(now()) @map("saved_at")
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  savedBy PlatformUser? @relation(fields: [savedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, savedAt(sort: Desc)])
+  @@map("theme_versions")
+}
+
+/// HQ sales pipeline — deliberately separate from the marketing site's `Lead` model
+/// (name/phone/cafeName capture form), which stays untouched. See NOTES.md decision #3.
+model SalesLead {
+  id           String         @id @default(uuid()) @db.Uuid
+  cafeName     String         @map("cafe_name")
+  ownerName    String         @map("owner_name")
+  phone        String
+  email        String?
+  city         String?
+  source       LeadSource?
+  stage        SalesLeadStage @default(lead)
+  lostReason   String?        @map("lost_reason")
+  ownerUserId  String?        @map("owner_user_id") @db.Uuid
+  tenantId     String?        @map("tenant_id") @db.Uuid
+  notes        String?
+  nextFollowUp DateTime?      @map("next_follow_up")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  tenant    Tenant?       @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  ownerUser PlatformUser? @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([stage])
+  @@map("sales_leads")
+}
+
+model CafeTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  description  String?
+  theme        Json
+  categories   Json
+  settings     Json
+  previewImage String?  @map("preview_image")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenants Tenant[]
+
+  @@map("cafe_templates")
+}
+
+model PaymentConfig {
+  tenantId         String   @id @map("tenant_id") @db.Uuid
+  acceptCash       Boolean  @default(true) @map("accept_cash")
+  acceptCounterUpi Boolean  @default(false) @map("accept_counter_upi")
+  acceptOnline     Boolean  @default(false) @map("accept_online")
+  gateway          String?
+  keyId            String?  @map("key_id")
+  keySecretEnc     String?  @map("key_secret_enc")
+  webhookSecretEnc String?  @map("webhook_secret_enc")
+  enabled          Boolean  @default(false)
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("payment_configs")
+}
+
+/// Append-only. Written inside the same transaction as the action it logs.
+model ActivityLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorEmail String   @map("actor_email")
+  tenantId   String?  @map("tenant_id") @db.Uuid
+  action     String
+  target     String?
+  summary    String
+  meta       Json?
+  ip         String?
+  at         DateTime @default(now())
+
+  actor  PlatformUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  tenant Tenant?       @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, at])
+  @@index([action, at])
+  @@map("activity_logs")
+}
+
+model ImpersonationSession {
+  id          String    @id @default(uuid()) @db.Uuid
+  actorId     String    @map("actor_id") @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  asProfileId String    @map("as_profile_id") @db.Uuid
+  reason      String
+  startedAt   DateTime  @default(now()) @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+
+  actor     PlatformUser @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  asProfile Profile      @relation(fields: [asProfileId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, startedAt])
+  @@map("impersonation_sessions")
+}
+
+model TenantHealth {
+  tenantId     String    @id @map("tenant_id") @db.Uuid
+  ordersToday  Int       @default(0) @map("orders_today")
+  activeUsers  Int       @default(0) @map("active_users")
+  lastOrderAt  DateTime? @map("last_order_at")
+  lastSeenAt   DateTime? @map("last_seen_at")
+  apiErrors24h Int       @default(0) @map("api_errors_24h")
+  lastBackupAt DateTime? @map("last_backup_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_health")
+}
+
+/// Platform-wide defaults, edited from /admin/settings (HQ-PORTAL-SPEC.md §13).
+/// Single row, id `global` — a settings *table* with one row rather than env
+/// vars, because ops has to change these without a redeploy, and every change
+/// should land in the activity log like any other HQ action.
+model PlatformSetting {
+  id                String   @id @default("global")
+  defaultGstPercent Decimal  @default(5) @map("default_gst_percent") @db.Decimal(4, 2)
+  defaultTrialDays  Int      @default(14) @map("default_trial_days")
+  defaultTableCount Int      @default(10) @map("default_table_count")
+  defaultPlanId     String?  @map("default_plan_id")
+  defaultSplitKitchen Boolean @default(true) @map("default_split_kitchen")
+  /// Hours before an unanswered support ticket is treated as breaching (§10).
+  supportSlaHours   Int      @default(24) @map("support_sla_hours")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+// ───────────────────────── marketing site (UNTOUCHED) ─────────────────────────
 
 enum LeadStatus {
   fresh
@@ -216,6 +622,7 @@ enum LeadStatus {
 }
 
 /// Marketing-site lead: cafe owner who asked to be contacted (landing page form).
+/// Not part of the HQ sales pipeline (see `SalesLead` above) — do not merge these.
 model Lead {
   id        String     @id @default(uuid()) @db.Uuid
   name      String
@@ -228,14 +635,4 @@ model Lead {
 
   @@index([status, createdAt])
   @@map("leads")
-}
-
-model Admin {
-  id           String    @id @default(uuid()) @db.Uuid
-  name         String
-  phone        String    @unique
-  passwordHash String    @map("password_hash")
-  role         AdminRole @default(founder) // single founder row in MVP; support_staff ready for later hires
-
-  @@map("admins")
 }

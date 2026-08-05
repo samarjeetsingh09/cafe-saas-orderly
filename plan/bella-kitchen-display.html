@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bëlla — Kitchen</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Sacramento&display=swap');
+:root{
+  --bg:#151b17; --panel:#1e2721; --panel2:#26312a;
+  --cream:#f5ecdd; --dim:rgba(245,236,221,.62); --faint:rgba(245,236,221,.34);
+  --line:rgba(245,236,221,.14);
+  --gold:#eac286; --veg:#8cc276; --nonveg:#d97a63; --amber:#e5ae52; --red:#d9614c;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--cream);font-family:'Poppins',system-ui,sans-serif;
+  display:flex;flex-direction:column;overflow:hidden}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- top rail ---------- */
+.rail{display:flex;align-items:center;gap:18px;padding:12px 20px;border-bottom:1px solid var(--line);
+  background:var(--panel);flex-wrap:wrap;flex:0 0 auto}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand .n{font-family:'Sacramento',cursive;font-size:34px;line-height:1}
+.brand .r{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--faint)}
+
+.station{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:4px;background:rgba(0,0,0,.28);position:relative}
+.station .glide{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;
+  background:rgba(234,194,134,.14);border:1px solid var(--gold);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.station[data-s="nonveg"] .glide{transform:translateX(100%)}
+.station button{position:relative;z-index:1;min-width:128px;background:none;border:0;padding:10px 16px;
+  color:var(--dim);font-size:12px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;
+  display:inline-flex;align-items:center;justify-content:center;gap:9px}
+.station button[aria-pressed="true"]{color:var(--gold)}
+.dot{width:13px;height:13px;border-radius:3px;border:1.6px solid var(--veg);position:relative;display:inline-block;flex:0 0 auto}
+.dot::after{content:"";position:absolute;inset:2.5px;border-radius:50%;background:var(--veg)}
+.dot.nv{border-color:var(--nonveg)}
+.dot.nv::after{background:var(--nonveg)}
+
+.spacer{flex:1}
+.gauge{text-align:center;padding:0 6px}
+.gauge b{display:block;font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.gauge em{font-style:normal;font-size:9px;letter-spacing:1.8px;text-transform:uppercase;color:var(--faint);
+  display:block;margin-top:6px}
+.gauge.warn b{color:var(--amber)}
+.gauge.hot b{color:var(--red)}
+.clock{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.tool{background:none;border:1px solid var(--line);border-radius:10px;color:var(--dim);
+  font-size:11px;letter-spacing:1.3px;text-transform:uppercase;padding:9px 14px}
+.tool:hover{border-color:var(--gold);color:var(--gold)}
+.tool.on{border-color:var(--gold);color:var(--gold);background:rgba(234,194,134,.1)}
+
+/* ---------- board ---------- */
+.board{flex:1;overflow-y:auto;padding:18px 20px 8px;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;align-content:start}
+.empty{grid-column:1/-1;text-align:center;padding:90px 20px;color:var(--faint);line-height:1.9}
+.empty .big{font-family:'Sacramento',cursive;font-size:44px;color:var(--dim);display:block;margin-bottom:6px}
+
+.tk{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--veg);
+  border-radius:14px;display:flex;flex-direction:column;overflow:hidden;animation:in .4s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:0;transform:translateY(-12px) scale(.97)}to{opacity:1;transform:none}}
+.tk.w-amber{border-left-color:var(--amber)}
+.tk.w-red{border-left-color:var(--red);box-shadow:0 0 0 1px rgba(217,97,76,.3)}
+.tk.new{border-color:rgba(234,194,134,.5)}
+.tk.done{opacity:.55}
+
+.tkh{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:13px 15px 11px;
+  background:rgba(0,0,0,.18)}
+.tkh .tbl{font-size:22px;font-weight:700;line-height:1;display:flex;align-items:center;gap:9px}
+.tkh .id{font-size:10px;letter-spacing:1.6px;color:var(--faint);margin-top:6px}
+.tkh .age{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;text-align:right}
+.tkh .age small{display:block;font-size:9px;font-weight:500;letter-spacing:1.4px;color:var(--faint);margin-top:5px}
+.tk.w-amber .age{color:var(--amber)}
+.tk.w-red .age{color:var(--red)}
+
+.items{padding:6px 0;flex:1}
+.it{display:flex;align-items:flex-start;gap:11px;padding:10px 15px;cursor:pointer;transition:background .15s}
+.it:hover{background:rgba(255,255,255,.03)}
+.it .qty{font-size:19px;font-weight:700;color:var(--gold);min-width:34px;line-height:1.2}
+.it .body{flex:1;min-width:0}
+.it .nm{font-size:16px;font-weight:600;line-height:1.3}
+.it .sz{font-size:12px;color:var(--dim);margin-top:3px}
+.it .box{width:22px;height:22px;border-radius:6px;border:1.6px solid var(--line);flex:0 0 auto;margin-top:2px;
+  display:grid;place-items:center}
+.it .box svg{width:13px;height:13px;opacity:0;transition:opacity .2s}
+.it.done .nm,.it.done .sz{text-decoration:line-through;opacity:.45}
+.it.done .qty{opacity:.45}
+.it.done .box{border-color:var(--veg);background:rgba(140,194,118,.16)}
+.it.done .box svg{opacity:1}
+.it.eightysix .nm{color:var(--red);text-decoration:line-through}
+
+.note{margin:0 15px 12px;background:rgba(229,174,82,.12);border-left:3px solid var(--amber);
+  border-radius:0 8px 8px 0;padding:9px 12px;font-size:13px;line-height:1.5;color:#f2d9a8}
+.note b{display:block;font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:var(--amber);margin-bottom:4px}
+
+.tkf{padding:12px 15px;border-top:1px solid var(--line);display:flex;gap:9px}
+.go{flex:1;border:0;border-radius:11px;padding:14px;font-size:13px;font-weight:700;
+  letter-spacing:1.6px;text-transform:uppercase;background:var(--gold);color:#1b211c}
+.go.ghost{background:none;border:1px solid var(--line);color:var(--dim);flex:0 0 auto;padding:14px 16px;font-size:12px}
+.go.ghost:hover{border-color:var(--gold);color:var(--gold)}
+.go:active{transform:scale(.985)}
+.prog{height:3px;background:rgba(0,0,0,.3)}
+.prog i{display:block;height:100%;background:var(--veg);transition:width .3s}
+
+/* ---------- ready strip ---------- */
+.strip{flex:0 0 auto;border-top:1px solid var(--line);background:var(--panel);padding:12px 20px;
+  display:flex;align-items:center;gap:14px;overflow-x:auto}
+.strip .lbl{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.rd{display:flex;align-items:center;gap:12px;background:rgba(140,194,118,.1);border:1px solid rgba(140,194,118,.4);
+  border-radius:11px;padding:9px 14px;white-space:nowrap}
+.rd b{font-size:17px;font-weight:700}
+.rd .id{font-size:10px;letter-spacing:1.3px;color:var(--faint);margin-top:3px}
+.rd .wait{font-size:11px;color:var(--amber);font-weight:600}
+.rd button{background:none;border:1px solid rgba(245,236,221,.25);border-radius:8px;color:var(--dim);
+  font-size:10px;letter-spacing:1.2px;text-transform:uppercase;padding:7px 11px}
+.rd button:hover{border-color:var(--gold);color:var(--gold)}
+.strip .none{font-size:12px;color:var(--faint);font-weight:300}
+
+/* ---------- 86 sheet ---------- */
+.scrim{position:fixed;inset:0;background:rgba(8,12,9,.78);opacity:0;pointer-events:none;transition:opacity .25s;z-index:50}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:fixed;right:0;top:0;bottom:0;width:min(420px,90vw);z-index:60;background:var(--panel);
+  border-left:1px solid var(--line);padding:22px;overflow-y:auto;transform:translateX(100%);
+  transition:transform .32s cubic-bezier(.2,.8,.2,1)}
+.sheet.show{transform:none}
+.sheet h3{font-family:'Sacramento',cursive;font-weight:400;font-size:34px;margin:0 0 4px}
+.sheet .hint{font-size:12px;color:var(--faint);font-weight:300;margin:0 0 18px;line-height:1.6}
+.grp{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:var(--faint);margin:20px 0 8px}
+.mrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.mrow .n{flex:1;font-size:14px;font-weight:500}
+.mrow.off .n{opacity:.45;text-decoration:line-through}
+.tog{position:relative;width:48px;height:26px;border-radius:999px;background:rgba(0,0,0,.34);
+  border:1px solid var(--line);padding:0;flex:0 0 auto}
+.tog::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;
+  background:var(--faint);transition:transform .22s,background .22s}
+.tog[aria-pressed="true"]{border-color:var(--veg);background:rgba(140,194,118,.18)}
+.tog[aria-pressed="true"]::after{transform:translateX(22px);background:var(--veg)}
+.closex{position:absolute;top:18px;right:20px;background:none;border:0;color:var(--faint);font-size:26px;line-height:1}
+
+.toast{position:fixed;left:50%;bottom:104px;transform:translate(-50%,180%);z-index:80;background:var(--gold);
+  color:#1b211c;border-radius:12px;padding:13px 22px;font-size:14px;font-weight:700;letter-spacing:.4px;
+  box-shadow:0 16px 38px rgba(0,0,0,.5);transition:transform .34s cubic-bezier(.2,.8,.2,1)}
+.toast.show{transform:translate(-50%,0)}
+
+@media (max-width:720px){
+  .board{grid-template-columns:1fr;padding:14px}
+  .brand .n{font-size:28px}
+  .gauge b{font-size:21px}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+</style>
+</head>
+<body>
+
+<div class="rail">
+  <div class="brand"><span class="n">Bëlla</span><span class="r">Kitchen</span></div>
+  <div class="station" id="station" data-s="veg">
+    <div class="glide"></div>
+    <button data-s="veg" aria-pressed="true"><i class="dot"></i>Veg</button>
+    <button data-s="nonveg" aria-pressed="false"><i class="dot nv"></i>Non-veg</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="gauge" id="gQueue"><b>0</b><em>On the pass</em></div>
+  <div class="gauge" id="gOldest"><b>0</b><em>Oldest, min</em></div>
+  <div class="gauge" id="gDone"><b>0</b><em>Done today</em></div>
+  <div class="clock" id="clock">--:--</div>
+  <button class="tool" id="btn86">86 list</button>
+  <button class="tool" id="btnSim">+ Ticket</button>
+  <button class="tool" id="btnFull">Full screen</button>
+</div>
+
+<div class="board" id="board"></div>
+
+<div class="strip" id="strip"></div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet">
+  <button class="closex" id="closeSheet">×</button>
+  <h3>86 list</h3>
+  <p class="hint">Kuch khatam ho gaya? Yahin se band karo — customer ke menu se turant hat jayega aur naye orders nahi aayenge.</p>
+  <div id="mlist"></div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==================================================================
+   Bëlla — Kitchen Display
+   Built for a wall screen: no prices, no payment, no analytics.
+   Only what a cook needs — what to fire, for which table, how late.
+================================================================== */
+
+const MENU = [
+  { c:'Bella Greens',        veg:true,  items:['Greek Salad','Bella Caesar Salad','Somtam Salad','Quinoa & Avocado Salad'] },
+  { c:'Garden Plates',       veg:true,  items:['Truffle Mushroom Bruschetta','Peri Peri Paneer Skewers','Loaded Nachos'] },
+  { c:'Wood-Fired Veg',      veg:true,  items:['Margherita','Garden Pesto'] },
+  { c:'Veg Mains',           veg:true,  items:['Penne Alfredo','Thai Green Curry'] },
+  { c:'Desserts',            veg:true,  items:['Molten Chocolate Cake','Coconut Panna Cotta'] },
+  { c:'Greens with Protein', veg:false, items:['Grilled Chicken Caesar','Smoked Salmon & Quinoa'] },
+  { c:'Tandoor & Grills',    veg:false, items:['Chicken Malai Tikka','Chilli Garlic Prawns'] },
+  { c:'Wood-Fired Non-Veg',  veg:false, items:['Smoked Chicken & Jalapeño','Pepperoni'] },
+  { c:'Non-Veg Mains',       veg:false, items:['Butter Chicken & Paratha','Grilled Fish & Lemon Butter'] }
+];
+const SIZES = { 'Margherita':['9"','12"'], 'Garden Pesto':['9"','12"'], 'Pepperoni':['9"','12"'],
+  'Smoked Chicken & Jalapeño':['9"','12"'], 'Greek Salad':['Regular','Large'], 'Bella Caesar Salad':['Regular','Large'],
+  'Chicken Malai Tikka':['6 pc','12 pc'], 'Butter Chicken & Paratha':['Half','Full'] };
+const NOTES = ['Less spicy','No onion','Jain — no garlic','Extra cheese','Serve with the mains',
+  'Birthday — send dessert last','Well done please','No jalapeño'];
+
+const dishes = MENU.flatMap(g => g.items.map(n => ({ n, cat:g.c, veg:g.veg, on:true })));
+const sizeOf = n => SIZES[n] ? SIZES[n][Math.floor(Math.random()*SIZES[n].length)] : 'Regular';
+
+let station = 'veg';
+let seq = 1060;
+let tickets = [];
+let doneCount = 0;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const rand = a => a[Math.floor(Math.random()*a.length)];
+const mins = t => Math.max(0, Math.floor((Date.now()-t)/60000));
+const secs = t => Math.max(0, Math.floor((Date.now()-t)/1000));
+
+function makeTicket(opts = {}){
+  const veg = opts.veg ?? (station === 'veg');
+  const pool = dishes.filter(d => d.veg === veg && d.on);
+  if(!pool.length) return null;
+  const n = 1 + Math.floor(Math.random()*3);
+  const items = [];
+  for(let i=0;i<n;i++){
+    const d = rand(pool);
+    if(items.some(x => x.n === d.n)) continue;
+    items.push({ n:d.n, sz:sizeOf(d.n), qty:1+Math.floor(Math.random()*2), done:false });
+  }
+  if(!items.length) return null;
+  return {
+    id:'B-'+(++seq), table:String(1+Math.floor(Math.random()*16)).padStart(2,'0'),
+    veg, items, note: Math.random()<.35 ? rand(NOTES) : null,
+    stage:'new', at: Date.now() - (opts.ageMin ?? 0)*60000, readyAt:null
+  };
+}
+
+function seed(){
+  tickets = [
+    makeTicket({veg:true,  ageMin:14}),
+    makeTicket({veg:true,  ageMin:7}),
+    makeTicket({veg:true,  ageMin:3}),
+    makeTicket({veg:false, ageMin:11}),
+    makeTicket({veg:false, ageMin:5}),
+    makeTicket({veg:false, ageMin:1})
+  ].filter(Boolean);
+  tickets[0].stage = 'fire';
+  tickets[3].stage = 'fire';
+  tickets[0].items[0].done = true;
+}
+
+/* ---------------- board ---------------- */
+const mine = () => tickets.filter(t => t.veg === (station==='veg'));
+const active = () => mine().filter(t => t.stage !== 'ready').sort((a,b)=>a.at-b.at);
+const readyNow = () => mine().filter(t => t.stage === 'ready').sort((a,b)=>a.readyAt-b.readyAt);
+
+function heat(t){ const m = mins(t.at); return m >= 14 ? 'w-red' : m >= 7 ? 'w-amber' : ''; }
+
+function render(){
+  const list = active();
+  $('#board').innerHTML = list.length ? list.map(card).join('') : `
+    <div class="empty"><span class="big">All clear</span>
+      Koi pending ticket nahi hai is station pe.<br>Naya order aate hi yahan apne aap dikhega.</div>`;
+
+  $$('[data-fire]').forEach(b => b.onclick = e => { e.stopPropagation(); fire(b.dataset.fire); });
+  $$('[data-ready]').forEach(b => b.onclick = e => { e.stopPropagation(); markReady(b.dataset.ready); });
+  $$('[data-allitems]').forEach(b => b.onclick = e => { e.stopPropagation(); tickAll(b.dataset.allitems); });
+  $$('[data-item]').forEach(el => el.onclick = () => {
+    const [id,ix] = el.dataset.item.split('|');
+    const t = tickets.find(x=>x.id===id);
+    t.items[+ix].done = !t.items[+ix].done;
+    render();
+  });
+
+  renderStrip();
+  renderGauges();
+}
+
+function card(t){
+  const doneN = t.items.filter(i=>i.done).length;
+  const pct = Math.round(doneN / t.items.length * 100);
+  return `<article class="tk ${heat(t)} ${t.stage==='new'?'new':''}">
+    <div class="tkh">
+      <div>
+        <div class="tbl"><i class="dot ${t.veg?'':'nv'}"></i>Table ${t.table}</div>
+        <div class="id">${t.id} · ${t.stage==='new'?'Not started':'Cooking'}</div>
+      </div>
+      <div class="age">${mins(t.at)}<small>min</small></div>
+    </div>
+    <div class="prog"><i style="width:${pct}%"></i></div>
+    <div class="items">
+      ${t.items.map((i,x)=>`<div class="it ${i.done?'done':''}" data-item="${t.id}|${x}">
+        <span class="qty">${i.qty}×</span>
+        <div class="body"><div class="nm">${i.n}</div><div class="sz">${i.sz}</div></div>
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="#8cc276" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>
+      </div>`).join('')}
+    </div>
+    ${t.note ? `<div class="note"><b>Note</b>${t.note}</div>` : ''}
+    <div class="tkf">
+      ${t.stage === 'new'
+        ? `<button class="go" data-fire="${t.id}">Start cooking</button>`
+        : `<button class="go" data-ready="${t.id}">Ready · ${doneN}/${t.items.length}</button>
+           ${doneN < t.items.length ? `<button class="go ghost" data-allitems="${t.id}">Tick all</button>` : ''}`}
+    </div>
+  </article>`;
+}
+
+function fire(id){
+  const t = tickets.find(x=>x.id===id);
+  t.stage = 'fire';
+  toast(`Table ${t.table} started`);
+  render();
+}
+function tickAll(id){
+  const t = tickets.find(x=>x.id===id);
+  t.items.forEach(i => i.done = true);
+  render();
+}
+function markReady(id){
+  const t = tickets.find(x=>x.id===id);
+  t.items.forEach(i => i.done = true);
+  t.stage = 'ready'; t.readyAt = Date.now();
+  doneCount++;
+  toast(`Table ${t.table} ready — call the floor`);
+  render();
+}
+
+function renderStrip(){
+  const rs = readyNow();
+  $('#strip').innerHTML = `<span class="lbl">Ready to pick up</span>` + (rs.length
+    ? rs.map(t => {
+        const w = mins(t.readyAt);
+        return `<div class="rd">
+          <div><b>Table ${t.table}</b><div class="id">${t.id}</div></div>
+          ${w >= 3 ? `<span class="wait">waiting ${w}m</span>` : ''}
+          <button data-picked="${t.id}">Picked up</button>
+          <button data-recall="${t.id}">Recall</button>
+        </div>`;
+      }).join('')
+    : `<span class="none">Kuch bhi pass pe nahi hai.</span>`);
+
+  $$('[data-picked]').forEach(b => b.onclick = () => {
+    const t = tickets.find(x=>x.id===b.dataset.picked);
+    tickets = tickets.filter(x=>x.id!==t.id);
+    toast(`Table ${t.table} picked up`);
+    render();
+  });
+  $$('[data-recall]').forEach(b => b.onclick = () => {
+    const t = tickets.find(x=>x.id===b.dataset.recall);
+    t.stage = 'fire'; t.readyAt = null; doneCount = Math.max(0, doneCount-1);
+    toast(`Table ${t.table} recalled to the pass`);
+    render();
+  });
+}
+
+function renderGauges(){
+  const list = active();
+  const oldest = list.length ? mins(list[0].at) : 0;
+  $('#gQueue').innerHTML = `<b>${list.length}</b><em>On the pass</em>`;
+  $('#gOldest').innerHTML = `<b>${oldest}</b><em>Oldest, min</em>`;
+  $('#gOldest').className = 'gauge ' + (oldest>=14?'hot':oldest>=7?'warn':'');
+  $('#gDone').innerHTML = `<b>${doneCount}</b><em>Done today</em>`;
+}
+
+/* ---------------- station ---------------- */
+$$('#station [data-s]').forEach(b => b.onclick = () => {
+  station = b.dataset.s;
+  $('#station').dataset.s = station;
+  $$('#station [data-s]').forEach(x => x.setAttribute('aria-pressed', x===b));
+  render();
+});
+
+/* ---------------- 86 list ---------------- */
+function renderMenuSheet(){
+  $('#mlist').innerHTML = MENU.filter(g => g.veg === (station==='veg')).map(g => `
+    <div class="grp">${g.c}</div>
+    ${g.items.map(n => {
+      const d = dishes.find(x=>x.n===n);
+      return `<div class="mrow ${d.on?'':'off'}">
+        <span class="n">${n}</span>
+        <button class="tog" aria-pressed="${d.on}" data-on="${n}"></button>
+      </div>`;
+    }).join('')}`).join('');
+
+  $$('[data-on]').forEach(b => b.onclick = () => {
+    const d = dishes.find(x=>x.n===b.dataset.on);
+    d.on = !d.on;
+    toast(`${d.n} ${d.on ? 'back on' : '86’d — off the menu'}`);
+    renderMenuSheet();
+  });
+}
+$('#btn86').onclick = () => {
+  renderMenuSheet();
+  $('#sheet').classList.add('show'); $('#scrim').classList.add('show');
+};
+const closeSheet = () => { $('#sheet').classList.remove('show'); $('#scrim').classList.remove('show'); };
+$('#closeSheet').onclick = closeSheet;
+$('#scrim').onclick = closeSheet;
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSheet(); });
+
+/* ---------------- tools ---------------- */
+$('#btnSim').onclick = () => {
+  const t = makeTicket();
+  if(!t){ toast('Is station ka sab kuch 86 hai'); return; }
+  tickets.push(t);
+  toast(`New ticket · Table ${t.table}`);
+  render();
+};
+$('#btnFull').onclick = () => {
+  const el = document.documentElement;
+  if(document.fullscreenElement){ document.exitFullscreen?.(); $('#btnFull').classList.remove('on'); }
+  else { el.requestFullscreen?.(); $('#btnFull').classList.add('on'); }
+};
+
+let tt;
+function toast(msg){
+  $('#toast').textContent = msg;
+  $('#toast').classList.add('show');
+  clearTimeout(tt);
+  tt = setTimeout(()=>$('#toast').classList.remove('show'), 2000);
+}
+
+setInterval(()=>{ $('#clock').textContent = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); }, 1000);
+setInterval(render, 20000);   // keep ages and heat colours honest
+
+$('#clock').textContent = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+seed();
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+/*
+ * OrderLy console/kitchen/customer design tokens — BUILD-SPEC.md §7.1.
+ * Frozen list; ported components reference nothing else (Rule 1/2, ../../CLAUDE.md).
+ * These are fallback defaults — components/theme.tsx overrides them per-tenant
+ * from `tenants.theme`, server-rendered so there's no colour flash.
+ *
+ * Declared on the three app shells, NOT on `:root`. `--bg`/`--surface`/`--accent`
+ * are names the marketing site's Tailwind theme also uses (`bg-surface`,
+ * `text-accent` → `var(--surface)`, `var(--accent)` from globals.css), and a
+ * global stylesheet loaded by any route stays in the document for the rest of
+ * the client-side session. On `:root` that meant one visit to /t/<token> or the
+ * console repainted the landing page in the dark cafe palette until a hard
+ * reload — white surfaces went botanical green. Scoping keeps both palettes in
+ * the same document without either one reaching the other.
+ * (menu-phone.css already worked around this from the other side, with its
+ * own `--mp-*` names — that namespace is still fine, just no longer load-bearing.)
+ */
+.ordering,
+.console,
+.kitchen-root {
+  --bg: #1d2520;
+  --surface: #28322a;
+  --surface-2: #303b32;
+  --ink: #f3e7d3;
+  --ink-dim: rgba(243, 231, 211, 0.6);
+  --ink-faint: rgba(243, 231, 211, 0.34);
+  --line: rgba(243, 231, 211, 0.13);
+  --accent: #e3b878;
+  --accent-2: #c9995a;
+  --veg: #7fb069;
+  --nonveg: #c96a55;
+  --warn: #d8a24a;
+  --danger: #c96a55;
+  /* Depth. The ported prototypes wrote literal rgba(0,0,0,…) for every sunken
+     fill, drop shadow and scrim, which only reads right on a dark palette —
+     a light-themed tenant got muddy grey boxes. `--shade-rgb` is the one knob
+     (an unwrapped `R G B` triple so each call site keeps its own alpha); the
+     three semantic tokens below cover the common strengths. */
+  --shade-rgb: 0 0 0;
+  --sunken: rgb(var(--shade-rgb) / 0.22);
+  --sunken-soft: rgb(var(--shade-rgb) / 0.15);
+  --shadow: rgb(var(--shade-rgb) / 0.45);
+  --scrim: rgb(var(--shade-rgb) / 0.72);
+  --radius: 14px;
+  --font-display: "Sacramento", cursive;
+  --font-body: "Poppins", system-ui, sans-serif;
+}
+
+/*
+ * Customer header block — consumed only by `.ordering header`.
+ *
+ * By default the header is a wash of the page background, which is right for
+ * a cafe whose whole menu is one colour. A cafe on a light palette can
+ * instead turn it into a solid masthead (the marketing hero's brown block)
+ * by setting `headerBg` in `tenants.theme`; the ink/line/depth tokens beside
+ * it are what let that block carry its own contrast, because the header's
+ * children — brand, tagline, kitchen switch, table chip — otherwise inherit
+ * a palette chosen for the page background, not for the block.
+ *
+ * Every default here resolves to the value the header already used, so a
+ * tenant that sets nothing renders byte-identically to before.
+ */
+.ordering {
+  --header-bg: linear-gradient(180deg, color-mix(in srgb, var(--bg) 90%, transparent), transparent);
+  --header-ink: var(--ink);
+  --header-ink-dim: var(--ink-dim);
+  --header-ink-faint: var(--ink-faint);
+  --header-accent: var(--accent);
+  --header-line: var(--line);
+  --header-sunken: var(--sunken);
+  --header-sunken-soft: var(--sunken-soft);
+}

@@ -1,193 +1,178 @@
-import { Prisma, type PaymentMode } from "@prisma/client";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { confirmationToken } from "@/lib/tokens";
+import { emit } from "@/lib/bus";
 import { allowInWindow } from "@/lib/rate-limit";
+import { boardOrderInclude, toBoardOrderDTO, type BoardOrderDTO } from "@/lib/owner-board";
 
 /**
- * Shared order-creation pipeline for cash (M4) and online (M5) modes.
- * Security doc 5.6/3.3: prices + availability re-read from the DB here,
- * never trusted from the client; order_number is sequential per cafe via
- * a pg advisory lock.
+ * Order creation — plan/BUILD-SPEC.md §9 `POST /api/orders`. Two request
+ * shapes, one pipeline: QR (anonymous, token-resolved table, Phase F) and
+ * staff (`channel: 'staff'`, session-authenticated `tableId` + `placedBy`,
+ * Phase H's "Take an order" POS). Prices/availability are always re-read
+ * from the DB here; the client only ever supplies `variantId` + `qty`.
  */
-
-const INDIAN_MOBILE = /^[6-9]\d{9}$/;
 const MAX_ORDERS_PER_TABLE_PER_MINUTE = 5;
-const RESUBMIT_WINDOW_MS = 45 * 1000;
+const INDIAN_MOBILE = /^[6-9]\d{9}$/;
 
-export type OrderInput = {
-  tableToken?: unknown;
-  sessionToken?: unknown;
-  customerName?: unknown;
-  customerPhone?: unknown;
-  items?: unknown;
-};
+const ItemsSchema = z
+  .array(
+    z.object({
+      variantId: z.string().uuid(),
+      qty: z.number().int().min(1).max(50),
+      note: z.string().max(200).nullish(),
+    })
+  )
+  .min(1)
+  .max(50);
+
+const QrOrderInput = z.object({
+  channel: z.literal("qr"),
+  qrToken: z.string().min(1),
+  items: ItemsSchema,
+  payMethod: z.enum(["cash", "online"]),
+  note: z.string().max(500).nullish(),
+  customerName: z.string().trim().min(1).max(60).nullish(),
+  customerPhone: z.string().regex(INDIAN_MOBILE).nullish(),
+  idempotencyKey: z.string().min(8).max(80).nullish(),
+});
+
+const StaffOrderInput = z.object({
+  channel: z.literal("staff"),
+  tableId: z.string().uuid(),
+  items: ItemsSchema,
+  payMethod: z.enum(["cash", "online"]),
+  note: z.string().max(500).nullish(),
+  idempotencyKey: z.string().min(8).max(80).nullish(),
+});
+
+export const CreateOrderInput = z.discriminatedUnion("channel", [QrOrderInput, StaffOrderInput]);
+export type CreateOrderInput = z.infer<typeof CreateOrderInput>;
 
 export type CreateOrderResult =
-  | {
-      ok: true;
-      duplicate: boolean;
-      order: {
-        id: string;
-        orderNumber: number;
-        confirmationToken: string;
-        totalAmountPaise: number;
-        sessionToken: string;
-      };
-    }
-  | { ok: false; status: number; error: string; soldOutItemIds?: string[] };
+  | { ok: true; order: BoardOrderDTO }
+  | { ok: false; status: number; error: string; unavailableNames?: string[] };
 
-export async function createCustomerOrder(
-  input: OrderInput,
-  paymentMode: PaymentMode,
-): Promise<CreateOrderResult> {
-  const tableToken = typeof input.tableToken === "string" ? input.tableToken : "";
-  const sessionToken = typeof input.sessionToken === "string" ? input.sessionToken : "";
-  const customerName = typeof input.customerName === "string" ? input.customerName.trim() : "";
-  const customerPhone = typeof input.customerPhone === "string" ? input.customerPhone.trim() : "";
+/** `staffCtx` is required (and trusted) when `input.channel === 'staff'` — the route owns auth. */
+export async function createOrder(input: CreateOrderInput, staffCtx?: { tenantId: string; profileId: string }): Promise<CreateOrderResult> {
+  const table =
+    input.channel === "qr"
+      ? await prisma.cafeTable.findUnique({
+          where: { qrToken: input.qrToken },
+          select: { id: true, label: true, active: true, tenant: { select: { id: true, slug: true, gstPercent: true, status: true } } },
+        })
+      : await prisma.cafeTable.findFirst({
+          where: { id: input.tableId, tenantId: staffCtx!.tenantId },
+          select: { id: true, label: true, active: true, tenant: { select: { id: true, slug: true, gstPercent: true, status: true } } },
+        });
 
-  if (!tableToken || !sessionToken || sessionToken.length < 12) {
-    return { ok: false, status: 400, error: "Invalid request" };
-  }
-  if (!customerName || customerName.length > 60) {
-    return { ok: false, status: 400, error: "Please enter your name" };
-  }
-  if (!INDIAN_MOBILE.test(customerPhone)) {
-    return { ok: false, status: 400, error: "Please enter a valid 10-digit mobile number" };
-  }
-
-  const rawItems = Array.isArray(input.items)
-    ? (input.items as { menuItemId?: unknown; quantity?: unknown }[])
-    : [];
-  const items = rawItems.filter(
-    (i): i is { menuItemId: string; quantity: number } =>
-      !!i &&
-      typeof i.menuItemId === "string" &&
-      Number.isInteger(i.quantity) &&
-      (i.quantity as number) > 0 &&
-      (i.quantity as number) <= 50,
-  );
-  if (items.length === 0 || items.length !== rawItems.length || items.length > 50) {
-    return { ok: false, status: 400, error: "Your cart looks empty. Add items and try again." };
-  }
-
-  const table = await prisma.table.findUnique({
-    where: { qrToken: tableToken },
-    select: { id: true, cafeId: true, cafe: { select: { menuEnabled: true } } },
-  });
   if (!table) {
-    return { ok: false, status: 404, error: "This QR code didn't work. Please scan again." };
+    return input.channel === "qr"
+      ? { ok: false, status: 404, error: "This QR code didn't work. Please scan again." }
+      : { ok: false, status: 404, error: "Table not found." };
   }
-  if (!table.cafe.menuEnabled) {
-    return {
-      ok: false,
-      status: 403,
-      error: "This menu is temporarily unavailable. Please ask the staff for assistance.",
-    };
+  if (!table.active || table.tenant.status === "paused" || table.tenant.status === "cancelled") {
+    return { ok: false, status: 403, error: "This menu is temporarily unavailable. Please ask the staff for assistance." };
   }
 
-  // Edge Case #10: cap orders per table per minute.
   if (!allowInWindow(`orders:${table.id}`, MAX_ORDERS_PER_TABLE_PER_MINUTE, 60_000)) {
-    return {
-      ok: false,
-      status: 429,
-      error: "Too many orders from this table right now. Please wait a moment.",
-    };
+    return { ok: false, status: 429, error: "Too many orders from this table right now. Please wait a moment." };
   }
 
-  // Double-submit (Security doc 5.10): quick re-post from the same session
-  // gets the already-created order back instead of a duplicate.
-  const recent = await prisma.order.findFirst({
-    where: {
-      customerSessionToken: sessionToken,
-      createdAt: { gte: new Date(Date.now() - RESUBMIT_WINDOW_MS) },
-    },
-    select: { id: true, orderNumber: true, confirmationToken: true, totalAmount: true },
-  });
-  if (recent) {
-    return {
-      ok: true,
-      duplicate: true,
-      order: {
-        id: recent.id,
-        orderNumber: recent.orderNumber,
-        confirmationToken: recent.confirmationToken,
-        totalAmountPaise: recent.totalAmount.mul(100).toNumber(),
-        sessionToken,
-      },
-    };
-  }
-
-  // Re-fetch live items: must exist, belong to this cafe, and be available.
-  const ids = items.map((i) => i.menuItemId);
-  const dbItems = await prisma.menuItem.findMany({
-    where: { id: { in: ids }, cafeId: table.cafeId },
-    select: { id: true, name: true, price: true, isAvailable: true },
-  });
-  const byId = new Map(dbItems.map((i) => [i.id, i]));
-
-  if (dbItems.length !== new Set(ids).size) {
-    return {
-      ok: false,
-      status: 409,
-      error: "Some items are no longer on the menu. Please review your cart.",
-    };
-  }
-  const soldOut = dbItems.filter((i) => !i.isAvailable);
-  if (soldOut.length > 0) {
-    return {
-      ok: false,
-      status: 409,
-      error: `Just sold out: ${soldOut.map((i) => i.name).join(", ")}. Please remove and try again.`,
-      soldOutItemIds: soldOut.map((i) => i.id),
-    };
-  }
-
-  const lines = items.map((i) => {
-    const db = byId.get(i.menuItemId)!;
-    return {
-      menuItemId: db.id,
-      itemNameSnapshot: db.name,
-      itemPriceSnapshot: db.price,
-      quantity: i.quantity,
-      subtotal: db.price.mul(i.quantity),
-    };
-  });
-  const totalAmount = lines.reduce((s, l) => s.add(l.subtotal), new Prisma.Decimal(0));
-
-  const order = await prisma.$transaction(async (tx) => {
-    // Advisory lock serializes numbering per cafe — safe under concurrency,
-    // released automatically at transaction end.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${table.cafeId}::text))`;
-    const [{ next }] = await tx.$queryRaw<[{ next: number }]>`
-      SELECT COALESCE(MAX(order_number), 0) + 1 AS next FROM orders WHERE cafe_id = ${table.cafeId}::uuid
-    `;
-    return tx.order.create({
-      data: {
-        cafeId: table.cafeId,
-        tableId: table.id,
-        orderNumber: Number(next),
-        customerSessionToken: sessionToken,
-        confirmationToken: confirmationToken(),
-        customerName,
-        customerPhone,
-        paymentMode,
-        paymentStatus: paymentMode === "cash" ? "cash_pending" : "payment_pending",
-        totalAmount,
-        orderItems: { create: lines },
-      },
-      select: { id: true, orderNumber: true, confirmationToken: true },
+  if (input.idempotencyKey) {
+    const existing = await prisma.order.findUnique({
+      where: { tenantId_idempotencyKey: { tenantId: table.tenant.id, idempotencyKey: input.idempotencyKey } },
+      include: boardOrderInclude,
     });
-  });
+    if (existing) return { ok: true, order: toBoardOrderDTO(existing) };
+  }
 
-  return {
-    ok: true,
-    duplicate: false,
-    order: {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      confirmationToken: order.confirmationToken,
-      totalAmountPaise: totalAmount.mul(100).toNumber(),
-      sessionToken,
-    },
-  };
+  const variantIds = input.items.map((i) => i.variantId);
+  const variants = await prisma.itemVariant.findMany({
+    where: { id: { in: variantIds }, tenantId: table.tenant.id },
+    include: { item: { select: { id: true, name: true, isVeg: true, available: true } } },
+  });
+  const byId = new Map(variants.map((v) => [v.id, v]));
+  if (variants.length !== new Set(variantIds).size) {
+    return { ok: false, status: 400, error: "Some items are no longer on the menu. Please review your cart." };
+  }
+
+  const unavailableNames = [...new Set(variants.filter((v) => !v.item.available).map((v) => v.item.name))];
+  if (unavailableNames.length > 0) {
+    return {
+      ok: false,
+      status: 409,
+      error: `Just sold out: ${unavailableNames.join(", ")}. Please remove and try again.`,
+      unavailableNames,
+    };
+  }
+
+  const lines = input.items.map((i) => ({ variant: byId.get(i.variantId)!, qty: i.qty, note: i.note ?? null }));
+  const subtotalPaise = lines.reduce((s, l) => s + l.variant.pricePaise * l.qty, 0);
+  const taxPaise = Math.round((subtotalPaise * Number(table.tenant.gstPercent)) / 100);
+  const totalPaise = subtotalPaise + taxPaise;
+  const isVegSet = new Set(lines.map((l) => l.variant.item.isVeg));
+  const station = isVegSet.size > 1 ? "mixed" : isVegSet.has(true) ? "veg" : "nonveg";
+  const codePrefix = table.tenant.slug.charAt(0).toUpperCase();
+
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<{ code: string }[]>`SELECT next_order_code(${table.tenant.id}::uuid, ${codePrefix}) as code`;
+      return tx.order.create({
+        data: {
+          tenantId: table.tenant.id,
+          code: rows[0].code,
+          tableId: table.id,
+          tableLabel: table.label,
+          station,
+          channel: input.channel,
+          placedBy: input.channel === "staff" ? staffCtx!.profileId : null,
+          customerName: input.channel === "qr" ? (input.customerName ?? null) : null,
+          customerPhone: input.channel === "qr" ? (input.customerPhone ?? null) : null,
+          note: input.note ?? null,
+          payMethod: input.payMethod,
+          payStatus: "pending",
+          subtotalPaise,
+          taxPaise,
+          totalPaise,
+          idempotencyKey: input.idempotencyKey ?? null,
+          items: {
+            create: lines.map((l) => ({
+              tenantId: table.tenant.id,
+              itemId: l.variant.item.id,
+              name: l.variant.item.name,
+              variantLabel: l.variant.label,
+              unitPaise: l.variant.pricePaise,
+              qty: l.qty,
+              isVeg: l.variant.item.isVeg,
+              note: l.note,
+            })),
+          },
+          events: {
+            create: {
+              tenantId: table.tenant.id,
+              fromStage: null,
+              toStage: "new",
+              actorKind: input.channel === "staff" ? "staff" : "customer",
+              actorId: input.channel === "staff" ? staffCtx!.profileId : null,
+            },
+          },
+        },
+        include: boardOrderInclude,
+      });
+    });
+
+    const dto = toBoardOrderDTO(order);
+    emit(table.tenant.id, "order.created", dto);
+    return { ok: true, order: dto };
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && input.idempotencyKey) {
+      const existing = await prisma.order.findUnique({
+        where: { tenantId_idempotencyKey: { tenantId: table.tenant.id, idempotencyKey: input.idempotencyKey } },
+        include: boardOrderInclude,
+      });
+      if (existing) return { ok: true, order: toBoardOrderDTO(existing) };
+    }
+    throw e;
+  }
 }

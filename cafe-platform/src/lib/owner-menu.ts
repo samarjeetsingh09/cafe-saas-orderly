@@ -1,85 +1,37 @@
 import { prisma } from "@/lib/db";
-import type { MenuCategoryDTO, MenuItemDTO } from "@/lib/menu";
+import type { CustomerCategoryDTO } from "@/lib/menu";
 
 /**
- * Owner menu management (M6). Unlike the customer fetch, empty categories
- * are kept (the owner just created one and needs to add dishes to it).
- * Every mutation is explicitly cafe-scoped — belt on the RLS suspenders.
+ * Menu manager data (Phase H #1) — reuses the exact same DTO shape
+ * `lib/menu.ts` built for the customer page (id/name/description/isVeg/
+ * available/variants already has everything the editor needs to render and
+ * mutate). Unlike `getCustomerMenu`, empty categories aren't filtered out —
+ * the owner needs to see a just-created category to add its first dish.
  */
-
-export async function getOwnerMenu(cafeId: string): Promise<MenuCategoryDTO[]> {
+export async function getMenuManagerData(tenantId: string): Promise<CustomerCategoryDTO[]> {
   const categories = await prisma.category.findMany({
-    where: { cafeId },
-    orderBy: { displayOrder: "asc" },
-    select: {
-      id: true,
-      name: true,
+    where: { tenantId, active: true },
+    orderBy: { sortOrder: "asc" },
+    include: {
       menuItems: {
-        orderBy: { displayOrder: "asc" },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          price: true,
-          photoUrl: true,
-          isVeg: true,
-          isAvailable: true,
-        },
+        orderBy: { sortOrder: "asc" },
+        include: { variants: { orderBy: { sortOrder: "asc" } } },
       },
     },
   });
+
   return categories.map((c) => ({
     id: c.id,
     name: c.name,
-    items: c.menuItems.map((i) => ({ ...i, price: i.price.toNumber() })),
+    isVeg: c.isVeg,
+    art: "leaf",
+    items: c.menuItems.map((it) => ({
+      id: it.id,
+      name: it.name,
+      description: it.description,
+      isVeg: it.isVeg,
+      available: it.available,
+      variants: it.variants.map((v) => ({ id: v.id, label: v.label, pricePaise: v.pricePaise })),
+    })),
   }));
-}
-
-/* ── Field validation (shared by the category/menu-item routes) ────── */
-
-export function cleanName(v: unknown, max = 80): string | null {
-  if (typeof v !== "string") return null;
-  const s = v.trim();
-  return s.length >= 1 && s.length <= max ? s : null;
-}
-
-/** Optional description: null clears it, "invalid" rejects the request. */
-export function cleanDescription(v: unknown): string | null | "invalid" {
-  if (v === undefined || v === null || v === "") return null;
-  if (typeof v !== "string") return "invalid";
-  const s = v.trim();
-  if (s.length > 300) return "invalid";
-  return s || null;
-}
-
-/** Price in rupees: positive, ≤ 1,00,000, at most 2 decimals. */
-export function cleanPrice(v: unknown): number | null {
-  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
-  if (!Number.isFinite(n) || n <= 0 || n > 100000) return null;
-  return Math.round(n * 100) / 100;
-}
-
-/** Optional photo URL: our own upload path (/api/images/…) or a full http(s) link. */
-export function cleanPhotoUrl(v: unknown): string | null | "invalid" {
-  if (v === undefined || v === null || v === "") return null;
-  if (typeof v !== "string" || v.length > 500) return "invalid";
-  if (/^\/api\/images\/[\w\-./]+$/.test(v) && !v.includes("..")) return v;
-  try {
-    const u = new URL(v);
-    return u.protocol === "http:" || u.protocol === "https:" ? v : "invalid";
-  } catch {
-    return "invalid";
-  }
-}
-
-export function serializeItem(i: {
-  id: string;
-  name: string;
-  description: string | null;
-  price: { toNumber(): number };
-  photoUrl: string | null;
-  isVeg: boolean;
-  isAvailable: boolean;
-}): MenuItemDTO {
-  return { ...i, price: i.price.toNumber() };
 }

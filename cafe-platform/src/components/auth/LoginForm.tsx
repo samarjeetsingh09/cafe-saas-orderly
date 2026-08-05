@@ -10,7 +10,7 @@ type Props = {
 
 export function LoginForm({ endpoint, redirectTo }: Props) {
   const router = useRouter();
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function LoginForm({ endpoint, redirectTo }: Props) {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
         router.replace(redirectTo);
@@ -53,24 +53,20 @@ export function LoginForm({ endpoint, redirectTo }: Props) {
       )}
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="phone" className="text-sm font-medium">
-          Phone number
+        <label htmlFor="email" className="text-sm font-medium">
+          Email
         </label>
         <div className="flex items-stretch rounded-lg border border-border bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/30">
-          <span className="flex select-none items-center border-r border-border px-3 text-sm text-muted">
-            +91
-          </span>
           <input
-            id="phone"
-            name="phone"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel-national"
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
             required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
-            placeholder="10-digit number"
-            className="w-full rounded-r-lg bg-transparent px-3 py-2.5 text-base outline-none placeholder:text-muted/60"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="w-full rounded-lg bg-transparent px-3 py-2.5 text-base outline-none placeholder:text-muted/60"
           />
         </div>
       </div>
