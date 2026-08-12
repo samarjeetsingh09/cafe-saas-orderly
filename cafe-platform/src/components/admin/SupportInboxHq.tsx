@@ -346,7 +346,7 @@ export function SupportInboxHq({
                 {detail.messages.map((m) => (
                   <div key={m.id} className="hq-msg" data-kind={m.internal ? "internal" : m.authorKind}>
                     <div className="who">
-                      {m.internal ? "Internal note" : m.authorKind === "support" ? "OrderLy support" : detail.tenantName} · {dateTime(m.at)}
+                      {m.internal ? "Internal note" : m.authorKind === "support" ? "Cafiyara support" : detail.tenantName} · {dateTime(m.at)}
                     </div>
                     {m.body}
                   </div>

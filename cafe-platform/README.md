@@ -1,7 +1,7 @@
-# OrderLy — Cafe QR Ordering Platform
+# Cafiyara — Cafe QR Ordering Platform
 
 Commission-free QR menu + table ordering for independent cafes, plus the internal HQ console
-OrderLy's own team runs the business from. Rebuilt per `../plan/START-HERE.md` (Phases A–J) on
+Cafiyara's own team runs the business from. Rebuilt per `../plan/START-HERE.md` (Phases A–J) on
 top of a `Tenant`-based schema — see `NOTES.md` for what changed and why, `PROGRESS.md` for the
 old pre-rebuild history (frozen, not current).
 

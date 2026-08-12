@@ -437,12 +437,12 @@ async function main() {
     create: {
       email: "hq@orderly.test",
       passwordHash: await bcrypt.hash("demo1234", 10),
-      fullName: "OrderLy HQ",
+      fullName: "Cafiyara HQ",
       role: "super_admin",
     },
   });
 
-  // ── Second tenant: Demo Cafe (marketing-site palette) ──────────────
+  // ── Second tenant: Cafiyara, the demo cafe (marketing-site palette) ─
   // Runs after plans exist, so its subscription can be attached. Bëlla above
   // is untouched by it — see prisma/demo-cafe.ts.
   const demo = await seedDemoCafe(prisma);
@@ -476,12 +476,12 @@ async function main() {
     { role: "kitchen (veg)", email: "veg@bella.test", password: "demo1234" },
     { role: "kitchen (nonveg)", email: "tandoor@bella.test", password: "demo1234" },
     { role: "HQ super_admin", email: "hq@orderly.test", password: "demo1234" },
-    { role: "owner (Demo Cafe)", email: "owner@democafe.test", password: "demo1234" },
-    { role: "kitchen veg (Demo Cafe)", email: "veg@democafe.test", password: "demo1234" },
-    { role: "kitchen nonveg (Demo Cafe)", email: "grill@democafe.test", password: "demo1234" },
+    { role: "owner (Cafiyara)", email: "owner@democafe.test", password: "demo1234" },
+    { role: "kitchen veg (Cafiyara)", email: "veg@democafe.test", password: "demo1234" },
+    { role: "kitchen nonveg (Cafiyara)", email: "grill@democafe.test", password: "demo1234" },
   ]);
 
-  if (demo.firstTable) console.log(`\nDemo Cafe table ${demo.firstTable.label} menu:  /t/${demo.firstTable.qrToken}`);
+  if (demo.firstTable) console.log(`\nCafiyara table ${demo.firstTable.label} menu:  /t/${demo.firstTable.qrToken}`);
 }
 
 main()

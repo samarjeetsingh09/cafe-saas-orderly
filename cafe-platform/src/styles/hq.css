@@ -1,5 +1,5 @@
 /*
- * OrderLy HQ — internal ops console design tokens.
+ * Cafiyara HQ — internal ops console design tokens.
  *
  * Scoped under `.hq` for the same reason `.console` scopes the cafe console
  * (NOTES.md Phase D): the marketing site's Tailwind theme owns `:root`, and

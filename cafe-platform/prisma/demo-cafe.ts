@@ -1,7 +1,8 @@
 /**
- * "Demo Cafe" — a second live tenant alongside Bëlla, themed to match the
- * OrderLy marketing site (globals.css: cream #fff8f1 paper, burnt-amber
- * accent, Fraunces display over Geist body) instead of Bëlla's dark botanical
+ * "Cafiyara" (demo cafe, slug "demo-cafe") — a second live tenant alongside
+ * Bëlla, themed to match the Cafiyara marketing site (globals.css: cream
+ * #fff8f1 paper, burnt-amber accent, Fraunces display over Geist body)
+ * instead of Bëlla's dark botanical
  * palette. It exists so the customer app can be shown in the same skin the
  * landing page wears, and so a second palette keeps the theming honest —
  * anything that only looks right on a dark theme shows up here immediately.
@@ -136,10 +137,10 @@ export async function seedDemoCafe(prisma: PrismaClient) {
     where: { slug: SLUG },
     // The theme is the point of this tenant, so it is re-applied on every run
     // (name/tagline too) — the menu below is what stays create-once.
-    update: { name: "Demo Cafe", tagline: "A Neighbourhood Coffee House", theme: THEME },
+    update: { name: "Cafiyara", tagline: "A Neighbourhood Coffee House", theme: THEME },
     create: {
       slug: SLUG,
-      name: "Demo Cafe",
+      name: "Cafiyara",
       tagline: "A Neighbourhood Coffee House",
       theme: THEME,
       currency: "INR",

@@ -12,7 +12,7 @@ import "@/styles/menu-phone.css";
  * rail, veg/non-veg kitchen switch, size pills, sold-out state, cart bar
  * and totals sheet. It wears the *marketing* palette (cream/brown/amber,
  * Fraunces + Geist) rather than the ordering app's dark green, because this
- * is OrderLy's shop window; a real cafe's screen wears that cafe's own
+ * is Cafiyara's shop window; a real cafe's screen wears that cafe's own
  * theme, which is what `/demo` shows.
  *
  * It never calls the order API — these dishes belong to no real cafe and no

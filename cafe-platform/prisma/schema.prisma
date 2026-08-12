@@ -1,4 +1,4 @@
-// OrderLy platform schema — Tenant-based rebuild (plan/BUILD-SPEC.md §4 + HQ-PORTAL-SPEC.md §2)
+// Cafiyara platform schema — Tenant-based rebuild (plan/BUILD-SPEC.md §4 + HQ-PORTAL-SPEC.md §2)
 // Postgres, not SQLite: uuid/jsonb/numeric used natively. See ../NOTES.md for decisions
 // made while adapting the plan docs onto this existing app (realtime, RLS, naming, etc).
 //

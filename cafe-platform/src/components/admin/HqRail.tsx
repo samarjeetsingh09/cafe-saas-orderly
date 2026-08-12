@@ -89,7 +89,7 @@ export function HqRail({
         <span className="dot" aria-hidden="true">
           <i />
         </span>
-        OrderLy <em>HQ</em>
+        Cafiyara <em>HQ</em>
       </div>
 
       {GROUPS.map((g) => {

@@ -21,7 +21,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Cafe QR Ordering",
+  title: "Cafiyara — Cafe QR Ordering",
   description: "Scan, order, pay, eat — commission-free QR ordering for cafes",
 };
 

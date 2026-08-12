@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# OrderLy/Bëlla rebuild — the four rules
+# Cafiyara/Bëlla rebuild — the four rules
 
 See `NOTES.md` and `../plan/START-HERE.md` for full context. These rules govern everything
 built after the login click (owner console, kitchen display, customer ordering, HQ portal).

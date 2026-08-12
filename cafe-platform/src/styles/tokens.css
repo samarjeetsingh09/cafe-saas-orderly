@@ -1,5 +1,5 @@
 /*
- * OrderLy console/kitchen/customer design tokens — BUILD-SPEC.md §7.1.
+ * Cafiyara console/kitchen/customer design tokens — BUILD-SPEC.md §7.1.
  * Frozen list; ported components reference nothing else (Rule 1/2, ../../CLAUDE.md).
  * These are fallback defaults — components/theme.tsx overrides them per-tenant
  * from `tenants.theme`, server-rendered so there's no colour flash.
